@@ -1,0 +1,12 @@
+@import 'tailwindcss' source(none);
+@source '../**/*.{js,ts,jsx,tsx}';
+
+@import 'tw-animate-css';
+
+@theme {
+  --font-family-display: 'Manrope', sans-serif;
+}
+
+* {
+  font-family: var(--font-family-display);
+}
