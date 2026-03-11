@@ -3,6 +3,7 @@ import { Button } from "../components/ui/button";
 import { Navbar } from "../components/navbar";
 import { Search, Calendar, Video, Shield, Languages, DollarSign, Star } from "lucide-react";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
+import { Brain, CheckCircle2 } from "lucide-react";
 
 export function LandingPage() {
   return (
@@ -133,6 +134,59 @@ export function LandingPage() {
             <div className="flex items-center gap-2 font-bold text-sm border-2 border-primary/50 rounded-full px-4 py-1">
               <Shield className="text-primary" size={16} />
               Verified by NMC
+            </div>
+          </div>
+        </div>
+
+        {/* AI Symptom Screening CTA */}
+        <div className="px-4 md:px-10 py-16 mb-8">
+          <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent rounded-3xl p-8 md:p-12 border-2 border-primary/20 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -mr-32 -mt-32"></div>
+            <div className="relative z-10 max-w-4xl mx-auto">
+              <div className="flex flex-col md:flex-row items-center gap-8">
+                <div className="flex-1">
+                  <div className="inline-flex items-center gap-2 bg-primary/20 text-primary px-4 py-2 rounded-full font-bold text-sm mb-4">
+                    <Brain size={16} />
+                    AI-Powered Technology
+                  </div>
+                  <h2 className="text-3xl md:text-4xl font-black mb-4">
+                    Not Sure Where to Start?
+                  </h2>
+                  <p className="text-lg text-muted-foreground mb-6">
+                    Take our free AI-powered symptom screening. In just 2 minutes, our intelligent triage system will analyze your concerns and recommend the perfect specialist for you.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <Link to="/screening">
+                      <Button className="h-12 px-8 rounded-lg bg-primary text-primary-foreground font-bold hover:bg-primary/90 shadow-lg shadow-primary/20 w-full sm:w-auto">
+                        <Brain className="mr-2" size={20} />
+                        Start Free Screening
+                      </Button>
+                    </Link>
+                    <Button variant="outline" className="h-12 px-8 rounded-lg font-bold w-full sm:w-auto">
+                      Learn How It Works
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-4 mt-6 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-1">
+                      <CheckCircle2 className="text-primary" size={16} />
+                      <span>87.3% Accuracy</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <CheckCircle2 className="text-primary" size={16} />
+                      <span>100% Confidential</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <CheckCircle2 className="text-primary" size={16} />
+                      <span>Takes 2 Minutes</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex-shrink-0">
+                  <div className="w-48 h-48 bg-primary/20 rounded-3xl flex items-center justify-center backdrop-blur-sm border-2 border-primary/30 shadow-2xl">
+                    <Brain className="text-primary" size={96} />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -22,6 +22,9 @@ export function Navbar() {
         {/* Desktop Navigation */}
         <nav className="hidden lg:flex flex-1 justify-end gap-8 items-center">
           <div className="flex items-center gap-8">
+            <Link to="/screening" className="text-sm font-medium hover:text-primary transition-colors">
+              AI Screening
+            </Link>
             <Link to="/therapists" className="text-sm font-medium hover:text-primary transition-colors">
               Find a Therapist
             </Link>
@@ -62,6 +65,13 @@ export function Navbar() {
       {mobileMenuOpen && (
         <div className="lg:hidden border-t border-border bg-background">
           <div className="px-4 py-4 flex flex-col gap-4">
+            <Link
+              to="/screening"
+              className="text-sm font-medium hover:text-primary transition-colors"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              AI Screening
+            </Link>
             <Link
               to="/therapists"
               className="text-sm font-medium hover:text-primary transition-colors"

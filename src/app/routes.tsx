@@ -7,12 +7,22 @@ import { AdminDashboard } from "./pages/admin-dashboard";
 import { BookingPage } from "./pages/booking-page";
 import { LoginPage } from "./pages/login-page";
 import { RegisterPage } from "./pages/register-page";
+import { SymptomScreening } from "./pages/symptom-screening";
+import { ScreeningResults } from "./pages/screening-results";
 import { NotFound } from "./pages/not-found";
 
 export const router = createBrowserRouter([
   {
     path: "/",
     Component: LandingPage,
+  },
+  {
+    path: "/screening",
+    Component: SymptomScreening,
+  },
+  {
+    path: "/screening/results",
+    Component: ScreeningResults,
   },
   {
     path: "/therapists",
