@@ -130,6 +130,15 @@ export function TherapistDashboard() {
               <h1 className="text-3xl font-bold text-foreground">
                 Dr. {user?.firstName} {user?.lastName}
               </h1>
+              {profile?.isVerified ? (
+                <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none">
+                  <CheckCircle size={12} className="mr-1" /> Verified
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-yellow-600 border-yellow-600">
+                  Pending Verification
+                </Badge>
+              )}
             </div>
             <p className="text-muted-foreground">
               {profile?.specialization?.join(', ') || 'Mental Health Professional'}
@@ -140,6 +149,16 @@ export function TherapistDashboard() {
             Logout
           </Button>
         </div>
+
+        {!profile?.isVerified && (
+          <div className="mb-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-3 text-yellow-800">
+            <XCircle className="text-yellow-600 mt-0.5" size={20} />
+            <div>
+              <p className="font-semibold">Account Pending Verification</p>
+              <p className="text-sm">Your profile is currently being reviewed by our administrators. You will be able to appear in the directory and manage appointments once your account is verified. This usually takes 24-48 hours.</p>
+            </div>
+          </div>
+        )}
 
         <div className="grid md:grid-cols-4 gap-4 mb-8">
           <Card>
@@ -215,14 +234,14 @@ export function TherapistDashboard() {
                   <div className="flex justify-between items-start mb-3">
                     <div>
                       <h3 className="font-semibold mb-1">
-                        {appointment.patient.user.firstName} {appointment.patient.user.lastName}
+                        {appointment.patient?.user?.firstName || 'Unknown'} {appointment.patient?.user?.lastName || 'Patient'}
                       </h3>
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Clock size={14} />
                           {formatTime(appointment.scheduledAt)}
                         </span>
-                        <span>{appointment.duration} min</span>
+                        <span>{appointment.duration || 60} min</span>
                       </div>
                       {appointment.aiPrediction && (
                         <p className="text-xs text-primary mt-1">
@@ -300,7 +319,7 @@ export function TherapistDashboard() {
                   <div key={appointment.id} className="border rounded-lg p-3">
                     <div className="mb-2">
                       <p className="font-semibold text-sm mb-1">
-                        {appointment.patient.user.firstName} {appointment.patient.user.lastName}
+                        {appointment.patient?.user?.firstName || 'Unknown'} {appointment.patient?.user?.lastName || 'Patient'}
                       </p>
                       <div className="text-xs text-muted-foreground space-y-1">
                         <div className="flex items-center gap-1">
@@ -324,30 +343,25 @@ export function TherapistDashboard() {
           </Card>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-8 mt-8">
-          <Card>
-            <CardHeader>
-              <CardTitle>Manage Profile</CardTitle>
-              <CardDescription>Update your professional information</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Button variant="outline" className="w-full justify-start gap-2">
-                <Settings size={16} />
-                Edit Profile & Bio
-              </Button>
-              <Button variant="outline" className="w-full justify-start gap-2">
-                <DollarSign size={16} />
-                Update Pricing
-              </Button>
-              <Button variant="outline" className="w-full justify-start gap-2" asChild>
-                <Link to="/dashboard/therapist/availability">
-                  <Calendar size={16} />
-                  Set Availability
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Button variant="outline" className="h-14 shadow-none border-border hover:bg-muted/50 transition-colors p-0" asChild>
+            <Link to="/dashboard/therapist/settings" className="flex items-center justify-center gap-3 w-full h-full">
+              <Settings size={20} className="text-primary" />
+              <span className="font-semibold">Edit Profile & Bio</span>
+            </Link>
+          </Button>
+          <Button variant="outline" className="h-14 shadow-none border-border hover:bg-muted/50 transition-colors p-0" asChild>
+            <Link to="/dashboard/therapist/settings" className="flex items-center justify-center gap-3 w-full h-full">
+              <DollarSign size={20} className="text-primary" />
+              <span className="font-semibold">Update Pricing</span>
+            </Link>
+          </Button>
+          <Button variant="outline" className="h-14 shadow-none border-border hover:bg-muted/50 transition-colors p-0" asChild>
+            <Link to="/dashboard/therapist/availability" className="flex items-center justify-center gap-3 w-full h-full">
+              <Calendar size={20} className="text-primary" />
+              <span className="font-semibold">Set Availability</span>
+            </Link>
+          </Button>
         </div>
       </div>
     </div>

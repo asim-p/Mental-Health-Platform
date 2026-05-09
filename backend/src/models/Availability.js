@@ -2,9 +2,8 @@ import mongoose, { Schema } from 'mongoose';
 
 const AvailabilitySchema = new Schema({
   therapistId: { type: Schema.Types.ObjectId, ref: 'TherapistProfile', required: true },
-  dayOfWeek: { type: Number, required: true },
-  startTime: { type: String, required: true },
-  endTime: { type: String, required: true },
+  dayOfWeek: { type: Number, required: true }, // 0-6
+  time: { type: String, required: true }, // e.g., "09:00"
   isAvailable: { type: Boolean, default: true }
 }, {
   timestamps: true,

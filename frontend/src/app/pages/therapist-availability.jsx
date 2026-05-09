@@ -41,9 +41,8 @@ export function TherapistAvailability() {
           const existingSlots = response.data.availability || [];
           setSlots(existingSlots.map(s => ({
             id: s.id,
-            dayOfWeek: s.dayOfWeek,
-            startTime: s.startTime,
-            endTime: s.endTime,
+            dayOfWeek: Number(s.dayOfWeek),
+            time: s.time,
             isAvailable: s.isAvailable
           })));
         }
@@ -61,8 +60,7 @@ export function TherapistAvailability() {
   const handleAddSlot = (dayIndex) => {
     const newSlot = {
       dayOfWeek: dayIndex,
-      startTime: "09:00",
-      endTime: "17:00",
+      time: "09:00",
       isAvailable: true,
     };
     setSlots([...slots, newSlot]);
@@ -159,16 +157,9 @@ export function TherapistAvailability() {
                               <div className="flex items-center gap-2">
                                 <Input 
                                   type="time" 
-                                  value={slot.startTime} 
-                                  onChange={(e) => handleUpdateSlot(index, { startTime: e.target.value })}
-                                  className="w-32 h-9"
-                                />
-                                <span className="text-muted-foreground">to</span>
-                                <Input 
-                                  type="time" 
-                                  value={slot.endTime} 
-                                  onChange={(e) => handleUpdateSlot(index, { endTime: e.target.value })}
-                                  className="w-32 h-9"
+                                  value={slot.time} 
+                                  onChange={(e) => handleUpdateSlot(index, { time: e.target.value })}
+                                  className="w-40 h-9"
                                 />
                               </div>
                             </div>

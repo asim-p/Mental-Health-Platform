@@ -33,6 +33,7 @@ export function AuthProvider({ children }) {
     if (response.success && response.data) {
       api.setToken(response.data.accessToken);
       setUser(response.data.user);
+      return response.data.user;
     } else {
       throw new Error('Login failed');
     }
@@ -43,6 +44,7 @@ export function AuthProvider({ children }) {
     if (response.success && response.data) {
       api.setToken(response.data.accessToken);
       setUser(response.data.user);
+      return response.data.user;
     } else {
       throw new Error('Registration failed');
     }

@@ -64,8 +64,11 @@ graph TD
 
 ## Technical Implementation Highlights
 
-### 1. AI-Assisted Therapist Matching
-When a patient completes an AI screening, the text is sent to the Flask service. The TF-IDF vectorizer converts the text into numerical features, which the Linear SVC model evaluates. The backend then uses the predicted category to query the MongoDB database for `TherapistProfile` documents where the `specialization` array contains the recommended fields, sorting them by rating and availability.
+### 1. Intelligent Weighted Matching
+When a patient completes an AI screening, the text is analyzed by the Flask service to predict a mental health category. The backend then executes a **Weighted Categorical Scoring (WCS)** aggregation pipeline. This algorithm calculates a "Relevance Score" for every verified therapist based on:
+*   **Clinical Match (10 pts):** Direct alignment with the AI prediction.
+*   **User Preferences (5 pts each):** Matching the user's preferred gender, budget, and language.
+Results are sorted by this score, ensuring the most relevant specialists are always presented first, even if some secondary preferences are not an exact match.
 
 ### 2. Real-Time Chat Infrastructure
 Using `Socket.io`, the platform establishes a persistent WebSocket connection between the client and the backend. When an appointment is confirmed, a unique chat room (`appointment:${appointmentId}`) is created. Messages are simultaneously broadcasted to connected clients for instant delivery and saved to the MongoDB `ChatMessage` collection for historical persistence and read-receipt tracking.

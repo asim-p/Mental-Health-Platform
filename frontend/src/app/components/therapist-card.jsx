@@ -1,33 +1,55 @@
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { Card, CardContent, CardFooter } from "./ui/card.jsx";
 import { Button } from "./ui/button.jsx";
 import { Badge } from "./ui/badge.jsx";
-import { Star, Languages, DollarSign, CheckCircle } from "lucide-react";
+import { Star, Languages, DollarSign, CheckCircle, Clock } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 
 export function TherapistCard({ therapist }) {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   const isTherapist = user?.role === 'THERAPIST';
+  const displayName = therapist.name;
+
+  const handleBookClick = () => {
+    if (!isAuthenticated) {
+      navigate('/login');
+    } else {
+      navigate(`/book/${therapist.id}`);
+    }
+  };
 
   return (
     <Card className="hover:shadow-xl transition-all hover:-translate-y-0.5 duration-300 border border-border">
       <CardContent className="pt-6">
         <div className="flex gap-4 mb-4">
           <div className="w-20 h-20 bg-primary/20 rounded-full flex items-center justify-center flex-shrink-0">
-            <span className="text-2xl font-semibold text-primary">
-              {therapist.name.split(" ").map(n => n[0]).join("")}
-            </span>
+            {therapist.profileImage ? (
+              <img 
+                src={therapist.profileImage} 
+                alt={displayName}
+                className="w-20 h-20 rounded-full object-cover"
+              />
+            ) : (
+              <span className="text-2xl font-semibold text-primary">
+                {displayName.split(" ").map(n => n[0]).join("")}
+              </span>
+            )}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <h3 className="font-bold text-lg truncate">{therapist.name}</h3>
+              <h3 className="font-bold text-lg truncate">{displayName}</h3>
               {therapist.verified && (
                 <CheckCircle className="text-primary flex-shrink-0" size={16} />
               )}
             </div>
             <p className="text-sm text-muted-foreground mb-2">{therapist.title}</p>
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
-              <span>{therapist.totalSessions || 0} sessions completed</span>
+              <span>{therapist.experience || 0} years experience</span>
+              <span className="flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                <span>Available</span>
+              </span>
             </div>
           </div>
         </div>
@@ -66,7 +88,7 @@ export function TherapistCard({ therapist }) {
           <div className="flex items-center gap-1 text-sm">
             <DollarSign size={14} className="text-muted-foreground" />
             <span className="font-semibold text-primary">NPR {therapist.pricePerSession}</span>
-            <span className="text-muted-foreground">/ 45 min session</span>
+            <span className="text-muted-foreground">/ hour</span>
           </div>
         </div>
 
@@ -77,11 +99,12 @@ export function TherapistCard({ therapist }) {
 
       {!isTherapist && (
         <CardFooter>
-          <Link to={`/book/${therapist.id}`} className="w-full">
-            <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
-              Book Appointment
-            </Button>
-          </Link>
+          <Button 
+            onClick={handleBookClick}
+            className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            Book Appointment
+          </Button>
         </CardFooter>
       )}
     </Card>

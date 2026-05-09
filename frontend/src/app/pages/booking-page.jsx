@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { Navbar } from "../components/navbar.jsx";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.jsx";
@@ -7,38 +7,143 @@ import { Badge } from "../components/ui/badge.jsx";
 import { Label } from "../components/ui/label.jsx";
 import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group.jsx";
 import { Calendar } from "../components/ui/calendar.jsx";
-import { mockTherapists } from "../data/therapists.js";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext.jsx";
-import { ArrowLeft, CheckCircle, Calendar as CalendarIcon, Clock, DollarSign } from "lucide-react";
+import { ArrowLeft, CheckCircle, Calendar as CalendarIcon, Clock, DollarSign, Languages, Loader2 } from "lucide-react";
+import { api } from "../services/api.js";
 
-const availableTimeSlots = [
-  "09:00 AM",
-  "10:00 AM",
-  "11:00 AM",
-  "02:00 PM",
-  "03:00 PM",
-  "04:00 PM",
-  "05:00 PM",
-];
+
 
 export function BookingPage() {
   const { therapistId } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   
-  useEffect(() => {
-    if (user?.role === 'THERAPIST') {
-      toast.error("Therapists cannot book other therapists.");
-      navigate("/therapists");
-    }
-  }, [user, navigate]);
-
+  const [therapist, setTherapist] = useState(null);
+  const [availableSlots, setAvailableSlots] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedTime, setSelectedTime] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("esewa");
 
-  const therapist = mockTherapists.find((t) => t.id === therapistId);
+  useEffect(() => {
+    if (isAuthLoading) return;
+
+    if (!user) {
+      toast.error("Please login to book an appointment");
+      navigate("/login");
+      return;
+    }
+
+    if (user.role === "THERAPIST") {
+      toast.error("Therapists cannot book appointments");
+      navigate("/therapists");
+    }
+  }, [user, isAuthLoading, navigate]);
+
+  useEffect(() => {
+    const loadTherapist = async () => {
+      try {
+        setIsLoading(true);
+        const response = await api.therapists.getById(therapistId);
+        if (response.success) {
+          setTherapist(response.data);
+        }
+      } catch (error) {
+        console.error("Failed to load therapist:", error);
+        toast.error("Therapist not found");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (therapistId) {
+      loadTherapist();
+    }
+  }, [therapistId]);
+
+  const generateSlots = useCallback((availability, bookedSlots, date) => {
+    const dayOfWeek = date.getDay();
+    const daySlots = availability.filter(a => Number(a.dayOfWeek) === dayOfWeek && a.isAvailable);
+    
+    if (daySlots.length === 0) return [];
+
+    const slots = [];
+    for (const slot of daySlots) {
+      const [hour, minute] = slot.time.split(":").map(Number);
+      const slotTime = new Date(date);
+      slotTime.setHours(hour, minute, 0, 0);
+      
+      const isoString = slotTime.toISOString();
+      const isBooked = bookedSlots.some(booked => new Date(booked).getTime() === slotTime.getTime());
+      const isPast = slotTime < new Date();
+
+      if (!isBooked && !isPast) {
+        const ampm = hour >= 12 ? "PM" : "AM";
+        const displayHour = hour % 12 || 12;
+        slots.push({
+          display: `${displayHour}:${minute.toString().padStart(2, '0')} ${ampm}`,
+          value: isoString
+        });
+      }
+    }
+    return slots.sort((a, b) => new Date(a.value).getTime() - new Date(b.value).getTime());
+  }, []);
+
+  useEffect(() => {
+    const loadAvailability = async () => {
+      if (!therapist || !selectedDate) return;
+      
+      try {
+        const dateStr = selectedDate.toISOString().split("T")[0];
+        const response = await api.therapists.getAvailability(therapist.user.id, dateStr);
+        if (response.success) {
+          const slots = generateSlots(response.data.availability, response.data.bookedSlots, selectedDate);
+          setAvailableSlots(slots);
+        }
+      } catch (error) {
+        console.error("Failed to load availability:", error);
+      }
+    };
+
+    loadAvailability();
+  }, [therapist, selectedDate, generateSlots]);
+
+  const handleBooking = async (e) => {
+    if (e) e.preventDefault();
+    
+    if (!selectedTime) {
+      toast.error("Please select a time slot");
+      return;
+    }
+
+    try {
+      const response = await api.appointments.create({
+        therapistId: therapist.id,
+        scheduledAt: selectedTime,
+        notes: "Booking via platform",
+      });
+
+      if (response.success) {
+        toast.success("Appointment booked successfully!");
+        setTimeout(() => {
+          navigate("/dashboard/patient");
+        }, 2000);
+      }
+    } catch (error) {
+      toast.error(error.message || "Failed to book appointment");
+    }
+  };
+
+  const displayName = therapist?.user ? `${therapist.user.firstName} ${therapist.user.lastName}` : therapist?.displayName || therapist?.name;
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (!therapist) {
     return (
@@ -49,7 +154,7 @@ export function BookingPage() {
             <CardContent className="py-12 text-center">
               <p className="text-gray-600 mb-4">Therapist not found</p>
               <Link to="/therapists">
-                <Button>Browse Therapists</Button>
+                <Button>Find Therapists</Button>
               </Link>
             </CardContent>
           </Card>
@@ -58,211 +163,163 @@ export function BookingPage() {
     );
   }
 
-  const handleBooking = () => {
-    if (!selectedDate || !selectedTime) {
-      toast.error("Please select both date and time for your appointment");
-      return;
-    }
-
-    // Simulate payment processing
-    toast.success("Booking confirmed! Redirecting to dashboard...");
-    setTimeout(() => {
-      navigate("/dashboard/patient");
-    }, 2000);
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
-
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Link to="/therapists" className="inline-flex items-center gap-2 text-teal-600 hover:text-teal-700 mb-6">
-          <ArrowLeft size={20} />
+      
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <Link to="/therapists" className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-6">
+          <ArrowLeft className="w-4 h-4" />
           Back to Therapists
         </Link>
 
-        <div className="grid lg:grid-cols-3 gap-8">
+        <div className="grid md:grid-cols-3 gap-8">
           {/* Therapist Info */}
-          <div className="lg:col-span-1">
+          <div className="md:col-span-1">
             <Card>
               <CardContent className="pt-6">
-                <div className="text-center mb-4">
-                  <div className="w-24 h-24 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <span className="text-3xl font-semibold text-teal-700">
-                      {therapist.name.split(" ").map(n => n[0]).join("")}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-center gap-2 mb-1">
-                    <h2 className="font-semibold text-xl">{therapist.name}</h2>
-                    {therapist.verified && (
-                      <CheckCircle className="text-teal-600" size={20} />
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-24 h-24 bg-primary/20 rounded-full flex items-center justify-center mb-4">
+                    {therapist.profileImage ? (
+                      <img 
+                        src={therapist.profileImage} 
+                        alt={displayName}
+                        className="w-24 h-24 rounded-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-3xl font-bold text-primary">
+                        {displayName.split(" ").map(n => n[0]).join("")}
+                      </span>
                     )}
                   </div>
-                  <p className="text-gray-600">{therapist.title}</p>
-                  <div className="flex items-center justify-center gap-2 mt-2">
-                    <span className="text-gray-500 text-sm">
-                      {therapist.totalSessions || 0} sessions completed
-                    </span>
+                  
+                  <h3 className="text-xl font-bold mb-2">{displayName}</h3>
+                  <p className="text-gray-600 mb-4">{therapist.title}</p>
+                  
+                  <div className="flex items-center gap-2 mb-4">
+                    {therapist.isVerified ? (
+                      <div className="flex items-center gap-1 text-green-600">
+                        <CheckCircle size={16} />
+                        <span className="text-sm">Verified</span>
+                      </div>
+                    ) : (
+                      <Badge className="text-xs bg-yellow-100 text-yellow-800 border-yellow-200">
+                        Verification Pending
+                      </Badge>
+                    )}
                   </div>
-                </div>
-
-                <div className="space-y-4 mb-6">
-                  <div>
-                    <p className="text-sm text-gray-500 mb-2">Specialties</p>
-                    <div className="flex flex-wrap gap-1">
-                      {therapist.specialties.map((specialty) => (
-                        <Badge key={specialty} variant="outline" className="text-xs">
-                          {specialty}
-                        </Badge>
-                      ))}
-                    </div>
+                  
+                  <div className="flex items-center gap-1 text-sm text-gray-600 mb-4">
+                    <Clock className="w-4 h-4" />
+                    <span>{therapist.yearsOfExperience || 0} years experience</span>
                   </div>
-
-                  <div>
-                    <p className="text-sm text-gray-500 mb-2">Languages</p>
+                  
+                  <div className="flex items-center gap-1 text-sm text-gray-600 mb-4">
+                    <DollarSign className="w-4 h-4" />
+                    <span>NPR {therapist.hourlyRate} / hour</span>
+                  </div>
+                  
+                  <div className="flex items-center gap-1 text-sm text-gray-600 mb-4">
+                    <Languages className="w-4 h-4" />
                     <div className="flex flex-wrap gap-1">
-                      {therapist.languages.map((lang) => (
+                      {therapist.languages?.map((lang) => (
                         <Badge key={lang} variant="secondary" className="text-xs">
                           {lang}
                         </Badge>
                       ))}
                     </div>
                   </div>
-
-                  <div>
-                    <p className="text-sm text-gray-500 mb-1">Education</p>
-                    <p className="text-sm">{therapist.education}</p>
+                  
+                  <div className="text-sm text-gray-600 text-left">
+                    <p className="font-medium mb-2">Specialties:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {therapist.specialization?.map((specialty) => (
+                        <Badge key={specialty} className="text-xs bg-primary/10 text-primary">
+                          {specialty}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
-
-                  <div>
-                    <p className="text-sm text-gray-500 mb-1">Experience</p>
-                    <p className="text-sm">{therapist.experience} years</p>
-                  </div>
-                </div>
-
-                <div className="border-t pt-4">
-                  <p className="text-sm text-gray-600 mb-2">About</p>
-                  <p className="text-sm text-gray-700">{therapist.bio}</p>
                 </div>
               </CardContent>
             </Card>
           </div>
 
           {/* Booking Form */}
-          <div className="lg:col-span-2">
+          <div className="md:col-span-2">
             <Card>
               <CardHeader>
-                <CardTitle>Book Your Appointment</CardTitle>
+                <CardTitle>Book Appointment with {displayName}</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Date Selection */}
-                <div>
-                  <Label className="text-base mb-3 flex items-center gap-2">
-                    <CalendarIcon size={18} />
-                    Select Date
-                  </Label>
-                  <div className="flex justify-center">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={setSelectedDate}
-                      disabled={(date) => date < new Date()}
-                      className="rounded-md border"
-                    />
+              <CardContent>
+                <form onSubmit={handleBooking} className="space-y-6">
+                  {/* Date Selection */}
+                  <div>
+                    <Label className="text-base font-medium mb-4 block">Select Date</Label>
+                    <div className="flex justify-center">
+                      <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={setSelectedDate}
+                        className="rounded-md border"
+                        disabled={(date) => date < new Date()}
+                      />
+                    </div>
                   </div>
-                </div>
 
-                {/* Time Selection */}
-                <div>
-                  <Label className="text-base mb-3 flex items-center gap-2">
-                    <Clock size={18} />
-                    Select Time Slot
-                  </Label>
-                  <RadioGroup value={selectedTime} onValueChange={setSelectedTime}>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                      {availableTimeSlots.map((time) => (
-                        <div key={time} className="flex items-center">
-                          <RadioGroupItem
-                            value={time}
-                            id={time}
-                            className="peer sr-only"
-                          />
-                          <Label
-                            htmlFor={time}
-                            className="flex-1 flex items-center justify-center p-3 rounded-lg border-2 cursor-pointer peer-data-[state=checked]:border-teal-600 peer-data-[state=checked]:bg-teal-50 hover:bg-gray-50 transition-colors"
+                  {/* Time Selection */}
+                  <div>
+                    <Label className="text-base font-medium mb-4 block">Select Time Slot</Label>
+                    {availableSlots.length > 0 ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {availableSlots.map((slot) => (
+                          <Button
+                            key={slot.value}
+                            type="button"
+                            variant={selectedTime === slot.value ? "default" : "outline"}
+                            className={selectedTime === slot.value ? "bg-teal-600 hover:bg-teal-700" : ""}
+                            onClick={() => setSelectedTime(slot.value)}
                           >
-                            {time}
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                  </RadioGroup>
-                </div>
-
-                {/* Payment Method */}
-                <div>
-                  <Label className="text-base mb-3 flex items-center gap-2">
-                    <DollarSign size={18} />
-                    Payment Method
-                  </Label>
-                  <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
-                    <div className="space-y-3">
-                      <div className="flex items-center">
-                        <RadioGroupItem value="esewa" id="esewa" className="peer sr-only" />
-                        <Label
-                          htmlFor="esewa"
-                          className="flex-1 flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer peer-data-[state=checked]:border-teal-600 peer-data-[state=checked]:bg-teal-50 hover:bg-gray-50 transition-colors"
-                        >
-                          <div className="w-12 h-8 bg-purple-100 rounded flex items-center justify-center">
-                            <span className="text-xs font-semibold text-purple-700">eSewa</span>
-                          </div>
-                          <span>eSewa Digital Wallet</span>
-                        </Label>
+                            {slot.display}
+                          </Button>
+                        ))}
                       </div>
-                      <div className="flex items-center">
-                        <RadioGroupItem value="khalti" id="khalti" className="peer sr-only" />
-                        <Label
-                          htmlFor="khalti"
-                          className="flex-1 flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer peer-data-[state=checked]:border-teal-600 peer-data-[state=checked]:bg-teal-50 hover:bg-gray-50 transition-colors"
-                        >
-                          <div className="w-12 h-8 bg-purple-700 rounded flex items-center justify-center">
-                            <span className="text-xs font-semibold text-white">Khalti</span>
-                          </div>
-                          <span>Khalti Digital Wallet</span>
-                        </Label>
-                      </div>
-                    </div>
-                  </RadioGroup>
-                </div>
+                    ) : (
+                      <p className="text-sm text-gray-500 text-center py-4 border rounded-md">
+                        No available slots for this date.
+                      </p>
+                    )}
+                  </div>
 
-                {/* Booking Summary */}
-                <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Session Duration</span>
-                    <span className="font-medium">45 minutes</span>
+                  {/* Payment Info */}
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3">
+                    <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center border border-green-100 shadow-sm">
+                      <span className="font-bold text-green-600 text-xs">eSewa</span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-green-900">Payment via eSewa</p>
+                      <p className="text-xs text-green-700">Fast and secure mobile payment.</p>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Session Fee</span>
-                    <span className="font-medium">NPR {therapist.pricePerSession}</span>
-                  </div>
-                  <div className="border-t pt-2 flex justify-between text-lg">
+
+                  <div className="border-t pt-4 flex justify-between text-lg">
                     <span className="font-semibold">Total</span>
                     <span className="font-bold text-teal-600">
-                      NPR {therapist.pricePerSession}
+                      NPR {therapist.pricePerSession || therapist.hourlyRate}
                     </span>
                   </div>
-                </div>
 
-                {/* Book Button */}
-                <Button
-                  onClick={handleBooking}
-                  disabled={!selectedDate || !selectedTime}
-                  className="w-full bg-teal-600 hover:bg-teal-700 h-12 text-base"
-                >
-                  Confirm & Pay NPR {therapist.pricePerSession}
-                </Button>
+                  {/* Book Button */}
+                  <Button
+                    type="submit"
+                    disabled={!selectedDate || !selectedTime}
+                    className="w-full bg-teal-600 hover:bg-teal-700 h-12 text-base"
+                  >
+                    Confirm & Pay NPR {therapist.pricePerSession || therapist.hourlyRate}
+                  </Button>
+                </form>
 
-                <p className="text-xs text-gray-500 text-center">
+                <p className="mt-4 text-xs text-gray-500 text-center">
                   By booking, you agree to our Terms of Service and Privacy Policy. 
                   You will receive a confirmation email once payment is processed.
                 </p>

@@ -98,7 +98,9 @@ def predict():
         
         return jsonify({
             'category': result['category'],
-            'description': result['description']
+            'description': result['description'],
+            'confidence': confidence,
+            'recommendedSpecializations': [result['category']]
         })
         
     except Exception as e:

@@ -1,6 +1,7 @@
 {
   "name": "mental-health-platform-backend",
   "version": "1.0.0",
+  "type": "module",
   "description": "Backend API for AI-Assisted Mental Health Screening and Consultation System",
   "main": "dist/index.js",
   "scripts": {

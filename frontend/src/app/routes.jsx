@@ -1,16 +1,17 @@
-import { createBrowserRouter } from "react-router";
+import { createBrowserRouter, Navigate } from "react-router";
 import { LandingPage } from "./pages/landing-page.jsx";
 import { TherapistDirectory } from "./pages/therapist-directory.jsx";
 import { PatientDashboard } from "./pages/patient-dashboard.jsx";
 import { TherapistDashboard } from "./pages/therapist-dashboard.jsx";
-import { AdminDashboard } from "./pages/admin-dashboard.jsx";
 import { BookingPage } from "./pages/booking-page.jsx";
 import { LoginPage } from "./pages/login-page.jsx";
 import { RegisterPage } from "./pages/register-page.jsx";
 import { SymptomScreening } from "./pages/symptom-screening.jsx";
 import { ScreeningResults } from "./pages/screening-results.jsx";
 import { TherapistAvailability } from "./pages/therapist-availability.jsx";
+import { TherapistProfileSettings } from "./pages/therapist-profile-settings.jsx";
 import { NotFound } from "./pages/not-found.jsx";
+import { ProtectedRoute } from "./components/protected-route.jsx";
 
 import { AboutPage } from "./pages/about-page.jsx";
 import { HowItWorksPage } from "./pages/how-it-works-page.jsx";
@@ -42,7 +43,11 @@ export const router = createBrowserRouter([
   },
   {
     path: "/book/:therapistId",
-    Component: BookingPage,
+    element: (
+      <ProtectedRoute allowedRoles={["PATIENT"]}>
+        <BookingPage />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/login",
@@ -54,19 +59,35 @@ export const router = createBrowserRouter([
   },
   {
     path: "/dashboard/patient",
-    Component: PatientDashboard,
+    element: (
+      <ProtectedRoute allowedRoles={["PATIENT"]}>
+        <PatientDashboard />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/dashboard/therapist",
-    Component: TherapistDashboard,
+    element: (
+      <ProtectedRoute allowedRoles={["THERAPIST"]}>
+        <TherapistDashboard />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/dashboard/therapist/availability",
-    Component: TherapistAvailability,
+    element: (
+      <ProtectedRoute allowedRoles={["THERAPIST"]}>
+        <TherapistAvailability />
+      </ProtectedRoute>
+    ),
   },
   {
-    path: "/dashboard/admin",
-    Component: AdminDashboard,
+    path: "/dashboard/therapist/settings",
+    element: (
+      <ProtectedRoute allowedRoles={["THERAPIST"]}>
+        <TherapistProfileSettings />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "*",

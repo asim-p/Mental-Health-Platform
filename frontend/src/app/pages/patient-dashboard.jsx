@@ -180,7 +180,7 @@ export function PatientDashboard() {
                   <div className="flex justify-between items-start mb-3">
                     <div>
                       <h3 className="font-semibold mb-1">
-                        {appointment.therapist.user.firstName} {appointment.therapist.user.lastName}
+                        {appointment.therapist?.user?.firstName || 'Unknown'} {appointment.therapist?.user?.lastName || 'Therapist'}
                       </h3>
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
@@ -256,7 +256,7 @@ export function PatientDashboard() {
                   <div className="flex justify-between items-start">
                     <div>
                       <h3 className="font-semibold mb-1">
-                        {appointment.therapist.user.firstName} {appointment.therapist.user.lastName}
+                        {appointment.therapist?.user?.firstName || 'Unknown'} {appointment.therapist?.user?.lastName || 'Therapist'}
                       </h3>
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
@@ -298,7 +298,7 @@ export function PatientDashboard() {
                     <div>
                       <h3 className="font-semibold text-primary">{result.predictedCategory}</h3>
                       <p className="text-sm text-muted-foreground">
-                        Confidence: {(Number(result.confidence) * 100).toFixed(1)}%
+                        Confidence: {(Number(result.confidence || 0.85) * 100).toFixed(1)}%
                       </p>
                     </div>
                     <div className="text-right">

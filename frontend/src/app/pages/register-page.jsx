@@ -10,6 +10,18 @@ import { Navbar } from '../components/navbar.jsx';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext.jsx';
 
+const CORE_SPECIALTIES = [
+  "General Consultation",
+  "Depression",
+  "Anxiety",
+  "Stress",
+  "Bipolar",
+  "Suicidal",
+  "Personality disorder",
+];
+
+const CORE_LANGUAGES = ["Nepali", "English", "Newari", "Maithili", "Bhojpuri"];
+
 export function RegisterPage() {
   const navigate = useNavigate();
   const { register } = useAuth();
@@ -31,13 +43,38 @@ export function RegisterPage() {
     confirmPassword: '',
     phone: '',
     licenseNumber: '',
-    specialization: '',
+    specialization: [],
     yearsOfExperience: '',
     bio: '',
+    hourlyRate: '',
+    gender: 'Other',
+    languages: [],
+    qualifications: '',
   });
 
+  const [otherSpecialty, setOtherSpecialty] = useState('');
+  const [otherLanguage, setOtherLanguage] = useState('');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  const handleToggleTag = (field, tag) => {
+    const currentTags = [...therapistForm[field]];
+    const index = currentTags.indexOf(tag);
+    if (index > -1) {
+      currentTags.splice(index, 1);
+    } else {
+      currentTags.push(tag);
+    }
+    setTherapistForm({ ...therapistForm, [field]: currentTags });
+  };
+
+  const handleAddOther = (field, value, setValue) => {
+    if (!value.trim()) return;
+    if (!therapistForm[field].includes(value.trim())) {
+      setTherapistForm({ ...therapistForm, [field]: [...therapistForm[field], value.trim()] });
+    }
+    setValue('');
+  };
 
   const handlePatientRegister = async (e) => {
     e.preventDefault();
@@ -97,15 +134,19 @@ export function RegisterPage() {
         phone: therapistForm.phone,
         role: 'THERAPIST',
         therapistData: {
-          specialization: therapistForm.specialization.split(',').map((s) => s.trim()),
+          specialization: therapistForm.specialization,
           yearsOfExperience: parseInt(therapistForm.yearsOfExperience) || 0,
           bio: therapistForm.bio,
           licenseNumber: therapistForm.licenseNumber,
+          hourlyRate: parseFloat(therapistForm.hourlyRate) || 0,
+          gender: therapistForm.gender,
+          languages: therapistForm.languages,
+          qualifications: therapistForm.qualifications.split(',').map((s) => s.trim()),
         },
       });
 
-      toast.success('Application submitted! You will be notified once verified.');
-      navigate('/login');
+      toast.success('Account created successfully!');
+      navigate('/dashboard/therapist');
     } catch (error) {
       toast.error('Registration failed. Please try again.');
     } finally {
@@ -317,17 +358,49 @@ export function RegisterPage() {
                     </p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="specialization">Specializations</Label>
-                    <Input
-                      id="specialization"
-                      type="text"
-                      placeholder="Anxiety, Depression, PTSD (comma separated)"
-                      value={therapistForm.specialization}
-                      onChange={(e) =>
-                        setTherapistForm({ ...therapistForm, specialization: e.target.value })
-                      }
-                      required
-                    />
+                    <Label>Specializations</Label>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {CORE_SPECIALTIES.map(spec => (
+                        <Button
+                          key={spec}
+                          type="button"
+                          variant={therapistForm.specialization.includes(spec) ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handleToggleTag('specialization', spec)}
+                          className="rounded-full h-8 text-xs"
+                        >
+                          {spec}
+                        </Button>
+                      ))}
+                      {therapistForm.specialization.filter(s => !CORE_SPECIALTIES.includes(s)).map(spec => (
+                        <Button
+                          key={spec}
+                          type="button"
+                          variant="default"
+                          size="sm"
+                          onClick={() => handleToggleTag('specialization', spec)}
+                          className="rounded-full h-8 text-xs bg-teal-600"
+                        >
+                          {spec} ×
+                        </Button>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Other specialty..."
+                        value={otherSpecialty}
+                        onChange={(e) => setOtherSpecialty(e.target.value)}
+                        className="h-8 text-xs"
+                      />
+                      <Button 
+                        type="button" 
+                        size="sm" 
+                        variant="secondary"
+                        onClick={() => handleAddOther('specialization', otherSpecialty, setOtherSpecialty)}
+                      >
+                        Add
+                      </Button>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="years-of-experience">Years of Experience</Label>
@@ -350,6 +423,89 @@ export function RegisterPage() {
                       placeholder="Brief professional background"
                       value={therapistForm.bio}
                       onChange={(e) => setTherapistForm({ ...therapistForm, bio: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="hourly-rate">Hourly Rate (NPR)</Label>
+                      <Input
+                        id="hourly-rate"
+                        type="number"
+                        placeholder="1500"
+                        value={therapistForm.hourlyRate}
+                        onChange={(e) => setTherapistForm({ ...therapistForm, hourlyRate: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="gender">Gender</Label>
+                      <select
+                        id="gender"
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        value={therapistForm.gender}
+                        onChange={(e) => setTherapistForm({ ...therapistForm, gender: e.target.value })}
+                        required
+                      >
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Languages</Label>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {CORE_LANGUAGES.map(lang => (
+                        <Button
+                          key={lang}
+                          type="button"
+                          variant={therapistForm.languages.includes(lang) ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handleToggleTag('languages', lang)}
+                          className="rounded-full h-8 text-xs"
+                        >
+                          {lang}
+                        </Button>
+                      ))}
+                      {therapistForm.languages.filter(l => !CORE_LANGUAGES.includes(l)).map(lang => (
+                        <Button
+                          key={lang}
+                          type="button"
+                          variant="default"
+                          size="sm"
+                          onClick={() => handleToggleTag('languages', lang)}
+                          className="rounded-full h-8 text-xs bg-teal-600"
+                        >
+                          {lang} ×
+                        </Button>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Other language..."
+                        value={otherLanguage}
+                        onChange={(e) => setOtherLanguage(e.target.value)}
+                        className="h-8 text-xs"
+                      />
+                      <Button 
+                        type="button" 
+                        size="sm" 
+                        variant="secondary"
+                        onClick={() => handleAddOther('languages', otherLanguage, setOtherLanguage)}
+                      >
+                        Add
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="qualifications">Qualifications</Label>
+                    <Input
+                      id="qualifications"
+                      type="text"
+                      placeholder="MA Psychology, PhD (comma separated)"
+                      value={therapistForm.qualifications}
+                      onChange={(e) => setTherapistForm({ ...therapistForm, qualifications: e.target.value })}
+                      required
                     />
                   </div>
                   <div className="space-y-2">

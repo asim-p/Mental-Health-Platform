@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 import { Button } from "./ui/button.jsx";
-import { Menu, X } from "lucide-react";
+import { Menu, X, User, Calendar, Settings, Brain } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 
@@ -10,75 +10,96 @@ export function Navbar() {
   const dashboardLink = user?.role ? `/dashboard/${user.role.toLowerCase()}` : "/dashboard/patient";
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur-sm">
-      <div className="px-4 md:px-10 py-3 flex items-center justify-between mx-auto max-w-[1280px]">
+    <header className="sticky top-0 z-50 w-full border-b border-gray-300 bg-white">
+      <div className="px-4 py-3 flex items-center justify-between max-w-6xl mx-auto">
         {/* Logo and Greeting */}
         <div className="flex items-center gap-6">
-          <Link to="/" className="flex items-center gap-4">
-            <div className="size-8 text-primary">
-              <svg className="h-full w-full" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-                <path clipRule="evenodd" d="M12.0799 24L4 19.2479L9.95537 8.75216L18.04 13.4961L18.0446 4H29.9554L29.96 13.4961L38.0446 8.75216L44 19.2479L35.92 24L44 28.7521L38.0446 39.2479L29.96 34.5039L29.9554 44H18.0446L18.04 34.5039L9.95537 39.2479L4 28.7521L12.0799 24Z" fill="currentColor" fillRule="evenodd" />
-              </svg>
+          <Link to="/" className="flex items-center gap-2 group">
+            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-primary-foreground group-hover:scale-110 transition-transform shadow-lg shadow-primary/20">
+              <Brain size={24} />
             </div>
-            <h2 className="text-xl font-bold leading-tight tracking-[-0.015em]">MHP</h2>
-          </Link>
-          {isAuthenticated && user?.firstName && (
-            <span className="text-sm font-medium hidden md:block">
-              Hi, {user.firstName}
+            <span className="text-2xl font-black tracking-tighter text-primary">
+              MHP
             </span>
+          </Link>
+
+          {/* Personalized Greeting */}
+          {isAuthenticated && user?.firstName && (
+            <div className="hidden md:flex items-center gap-6 text-gray-600">
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  <span className="text-sm font-medium">
+                    Hello, {user.firstName}
+                  </span>
+                </div>
+                <span className="text-xs text-gray-500">
+                  {user.role === 'THERAPIST' ? 'Therapist' : 'Patient'}
+                </span>
+              </div>
+            </div>
           )}
         </div>
 
         {/* Desktop Navigation */}
-        <nav className="hidden lg:flex flex-1 justify-end gap-8 items-center">
-          <div className="flex items-center gap-8">
-            {user?.role !== 'THERAPIST' && (
-              <Link to="/screening" className="text-sm font-medium hover:text-primary transition-colors">
+        <nav className="hidden lg:flex items-center gap-6">
+          {user?.role === 'THERAPIST' ? (
+            // Therapist Navigation
+            <>
+              <Link to="/dashboard/therapist" className="text-gray-700 hover:text-green-600 font-medium">
+                My Dashboard
+              </Link>
+              <Link to="/dashboard/therapist/availability" className="text-gray-700 hover:text-green-600 font-medium">
+                Availability
+              </Link>
+              <Link to="/dashboard/therapist/settings" className="text-gray-700 hover:text-green-600 font-medium">
+                Profile Settings
+              </Link>
+            </>
+          ) : (
+            // Patient Navigation
+            <>
+              <Link to="/screening" className="text-gray-700 hover:text-green-600 font-medium">
                 AI Screening
               </Link>
-            )}
-            <Link to="/therapists" className="text-sm font-medium hover:text-primary transition-colors">
-              {user?.role === 'THERAPIST' ? "Other Therapists" : "Find a Therapist"}
-            </Link>
-            {user?.role === 'THERAPIST' && (
-              <Link to="/dashboard/therapist/availability" className="text-sm font-medium hover:text-primary transition-colors">
-                My Availability
+              <Link to="/therapists" className="text-gray-700 hover:text-green-600 font-medium">
+                Find Therapists
               </Link>
-            )}
-            <Link to="/how-it-works" className="text-sm font-medium hover:text-primary transition-colors">
-              How it Works
-            </Link>
-            <Link to="/about" className="text-sm font-medium hover:text-primary transition-colors">
-              About Us
-            </Link>
-          </div>
-          <div className="flex gap-3">
-            {isAuthenticated ? (
-              <div className="flex items-center gap-3">
-                <Link to={dashboardLink}>
-                  <Button variant="ghost" className="h-10 px-5 rounded-lg bg-border hover:bg-primary/20 text-sm font-bold">
-                    Dashboard
-                  </Button>
-                </Link>
-                <Button onClick={logout} className="h-10 px-5 rounded-lg bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 shadow-sm">
-                  Logout
+              <Link to="/how-it-works" className="text-gray-700 hover:text-green-600 font-medium">
+                How It Works
+              </Link>
+            </>
+          )}
+
+          <Link to="/about" className="text-gray-700 hover:text-green-600 font-medium">
+            About
+          </Link>
+
+          {isAuthenticated ? (
+            <div className="flex items-center gap-3">
+              <Link to={dashboardLink}>
+                <Button variant="outline" className="border-green-600 text-green-600 hover:bg-green-50">
+                  Dashboard
                 </Button>
-              </div>
-            ) : (
-              <>
-                <Link to="/login">
-                  <Button variant="ghost" className="h-10 px-5 rounded-lg bg-border hover:bg-primary/20 text-sm font-bold">
-                    Login
-                  </Button>
-                </Link>
-                <Link to="/register">
-                  <Button className="h-10 px-5 rounded-lg bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 shadow-sm">
-                    Register
-                  </Button>
-                </Link>
-              </>
-            )}
-          </div>
+              </Link>
+              <Button onClick={logout} className="bg-green-600 text-white hover:bg-green-700">
+                Logout
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <Link to="/login">
+                <Button variant="outline" className="border-green-600 text-green-600 hover:bg-green-50">
+                  Login
+                </Button>
+              </Link>
+              <Link to="/register">
+                <Button className="bg-green-600 text-white hover:bg-green-700">
+                  Register
+                </Button>
+              </Link>
+            </div>
+          )}
         </nav>
 
         {/* Mobile Menu Button */}
@@ -92,74 +113,115 @@ export function Navbar() {
 
       {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="lg:hidden border-t border-border bg-background">
-          <div className="px-4 py-4 flex flex-col gap-4">
-            {user?.role !== 'THERAPIST' && (
-              <Link
-                to="/screening"
-                className="text-sm font-medium hover:text-primary transition-colors"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                AI Screening
-              </Link>
+        <div className="lg:hidden border-t border-gray-300 bg-white px-4 py-4">
+          <div className="flex flex-col gap-4">
+            {/* Mobile Greeting */}
+            {isAuthenticated && user?.firstName && (
+              <div className="flex items-center gap-2 text-gray-600 pb-2">
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2">
+                    <User className="w-4 h-4" />
+                    <span className="text-sm font-medium">
+                      Hello, {user.firstName}
+                    </span>
+                  </div>
+                  <span className="text-xs text-gray-500">
+                    {user.role === 'THERAPIST' ? 'Therapist' : 'Patient'}
+                  </span>
+                </div>
+              </div>
             )}
-            <Link
-              to="/therapists"
-              className="text-sm font-medium hover:text-primary transition-colors"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              {user?.role === 'THERAPIST' ? "Other Therapists" : "Find a Therapist"}
-            </Link>
-            {user?.role === 'THERAPIST' && (
-              <Link
-                to="/dashboard/therapist/availability"
-                className="text-sm font-medium hover:text-primary transition-colors"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                My Availability
-              </Link>
+
+            {/* Mobile Navigation */}
+            {user?.role === 'THERAPIST' ? (
+              // Therapist Mobile Navigation
+              <>
+                <Link
+                  to="/dashboard/therapist"
+                  className="text-gray-700 hover:text-green-600 font-medium"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  My Dashboard
+                </Link>
+                <Link
+                  to="/dashboard/therapist/availability"
+                  className="text-gray-700 hover:text-green-600 font-medium"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Availability
+                </Link>
+                <Link
+                  to="/dashboard/therapist/settings"
+                  className="text-gray-700 hover:text-green-600 font-medium"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Profile Settings
+                </Link>
+              </>
+            ) : (
+              // Patient Mobile Navigation
+              <>
+                <Link
+                  to="/screening"
+                  className="text-gray-700 hover:text-green-600 font-medium"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  AI Screening
+                </Link>
+                <Link
+                  to="/therapists"
+                  className="text-gray-700 hover:text-green-600 font-medium"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Find Therapists
+                </Link>
+                <Link
+                  to="/how-it-works"
+                  className="text-gray-700 hover:text-green-600 font-medium"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  How It Works
+                </Link>
+              </>
             )}
-            <Link
-              to="/how-it-works"
-              className="text-sm font-medium hover:text-primary transition-colors"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              How it Works
-            </Link>
+
             <Link
               to="/about"
-              className="text-sm font-medium hover:text-primary transition-colors"
+              className="text-gray-700 hover:text-green-600 font-medium"
               onClick={() => setMobileMenuOpen(false)}
             >
-              About Us
+              About
             </Link>
-            <div className="flex flex-col gap-3 pt-2">
-              {isAuthenticated ? (
-                <>
-                  <Link to={dashboardLink} onClick={() => setMobileMenuOpen(false)}>
-                    <Button variant="ghost" className="w-full h-10 px-5 rounded-lg bg-border hover:bg-primary/20 text-sm font-bold">
-                      Dashboard
-                    </Button>
-                  </Link>
-                  <Button onClick={() => { logout(); setMobileMenuOpen(false); }} className="w-full h-10 px-5 rounded-lg bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 shadow-sm">
-                    Logout
+
+            {/* Mobile Auth Buttons */}
+            {isAuthenticated ? (
+              <div className="flex flex-col gap-3 pt-2">
+                <Link to={dashboardLink} onClick={() => setMobileMenuOpen(false)}>
+                  <Button variant="outline" className="w-full border-green-600 text-green-600 hover:bg-green-50">
+                    Dashboard
                   </Button>
-                </>
-              ) : (
-                <>
-                  <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
-                    <Button variant="ghost" className="w-full h-10 px-5 rounded-lg bg-border hover:bg-primary/20 text-sm font-bold">
-                      Login
-                    </Button>
-                  </Link>
-                  <Link to="/register" onClick={() => setMobileMenuOpen(false)}>
-                    <Button className="w-full h-10 px-5 rounded-lg bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 shadow-sm">
-                      Register
-                    </Button>
-                  </Link>
-                </>
-              )}
-            </div>
+                </Link>
+                <Button
+                  onClick={() => { logout(); setMobileMenuOpen(false); }}
+                  className="w-full bg-green-600 text-white hover:bg-green-700"
+                >
+                  Logout
+                </Button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3 pt-2">
+                <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
+                  <Button variant="outline" className="w-full border-green-600 text-green-600 hover:bg-green-50">
+                    Login
+                  </Button>
+                </Link>
+                <Link to="/register" onClick={() => setMobileMenuOpen(false)}>
+                  <Button className="w-full bg-green-600 text-white hover:bg-green-700">
+                    Register
+                  </Button>
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       )}

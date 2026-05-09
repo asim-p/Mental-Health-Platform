@@ -4,7 +4,6 @@ import PatientProfile from '../models/PatientProfile.js';
 import TherapistProfile from '../models/TherapistProfile.js';
 import Payment from '../models/Payment.js';
 import ChatMessage from '../models/ChatMessage.js';
-import Review from '../models/Review.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { createError } from '../middleware/errorHandler.js';
 import { z } from 'zod';
@@ -48,25 +47,25 @@ router.get('/', authenticate, async (req, res, next) => {
       .lean();
 
     const mappedAppointments = appointments.map((a) => {
-       a.id = a._id.toString();
-       if(a.patientId) {
-           a.patient = a.patientId;
-           a.patient.id = a.patient._id.toString();
-           if(a.patient.user) a.patient.user.id = a.patient.user._id.toString();
-           delete a.patientId;
-       }
-       if(a.therapistId) {
-           a.therapist = a.therapistId;
-           a.therapist.id = a.therapist._id.toString();
-           if(a.therapist.user) a.therapist.user.id = a.therapist.user._id.toString();
-           delete a.therapistId;
-       }
-       if(a.paymentId) {
-           a.payment = a.paymentId;
-           a.payment.id = a.payment._id.toString();
-           delete a.paymentId;
-       }
-       return a;
+      a.id = a._id.toString();
+      if (a.patientId) {
+        a.patient = a.patientId;
+        a.patient.id = a.patient._id.toString();
+        if (a.patient.user) a.patient.user.id = a.patient.user._id.toString();
+        delete a.patientId;
+      }
+      if (a.therapistId) {
+        a.therapist = a.therapistId;
+        a.therapist.id = a.therapist._id.toString();
+        if (a.therapist.user) a.therapist.user.id = a.therapist.user._id.toString();
+        delete a.therapistId;
+      }
+      if (a.paymentId) {
+        a.payment = a.paymentId;
+        a.payment.id = a.payment._id.toString();
+        delete a.paymentId;
+      }
+      return a;
     });
 
     res.json({
@@ -99,22 +98,22 @@ router.get('/:id', authenticate, async (req, res, next) => {
     }
 
     appointment.id = appointment._id.toString();
-    if(appointment.patientId) {
-       appointment.patient = appointment.patientId;
-       appointment.patient.id = appointment.patient._id.toString();
-       if(appointment.patient.user) appointment.patient.user.id = appointment.patient.user._id.toString();
-       delete appointment.patientId;
+    if (appointment.patientId) {
+      appointment.patient = appointment.patientId;
+      appointment.patient.id = appointment.patient._id.toString();
+      if (appointment.patient.user) appointment.patient.user.id = appointment.patient.user._id.toString();
+      delete appointment.patientId;
     }
-    if(appointment.therapistId) {
-       appointment.therapist = appointment.therapistId;
-       appointment.therapist.id = appointment.therapist._id.toString();
-       if(appointment.therapist.user) appointment.therapist.user.id = appointment.therapist.user._id.toString();
-       delete appointment.therapistId;
+    if (appointment.therapistId) {
+      appointment.therapist = appointment.therapistId;
+      appointment.therapist.id = appointment.therapist._id.toString();
+      if (appointment.therapist.user) appointment.therapist.user.id = appointment.therapist.user._id.toString();
+      delete appointment.therapistId;
     }
-    if(appointment.paymentId) {
-       appointment.payment = appointment.paymentId;
-       appointment.payment.id = appointment.payment._id.toString();
-       delete appointment.paymentId;
+    if (appointment.paymentId) {
+      appointment.payment = appointment.paymentId;
+      appointment.payment.id = appointment.payment._id.toString();
+      delete appointment.paymentId;
     }
 
     appointment.chatMessages = await ChatMessage.find({ appointmentId: appointment._id }).sort({ createdAt: 1 }).lean();
@@ -171,7 +170,7 @@ router.post('/', authenticate, authorize('PATIENT'), async (req, res, next) => {
       aiPrediction: data.aiPrediction,
       status: 'PENDING',
     });
-    
+
     const payment = new Payment({
       appointmentId: appointment._id,
       amount: therapistProfile.hourlyRate,
@@ -196,9 +195,9 @@ router.patch('/:id/confirm', authenticate, authorize('THERAPIST', 'ADMIN'), asyn
     const { id } = req.params;
 
     const appointment = await Appointment.findByIdAndUpdate(id, {
-        status: 'CONFIRMED',
-        zoomMeetingUrl: `https://zoom.us/j/${uuidv4().replace(/-/g, '').substring(0, 10)}`,
-        zoomJoinUrl: `https://zoom.us/j/${uuidv4().replace(/-/g, '').substring(0, 10)}`,
+      status: 'CONFIRMED',
+      zoomMeetingUrl: `https://zoom.us/j/${uuidv4().replace(/-/g, '').substring(0, 10)}`,
+      zoomJoinUrl: `https://zoom.us/j/${uuidv4().replace(/-/g, '').substring(0, 10)}`,
     }, { new: true });
 
     res.json({
@@ -251,7 +250,7 @@ router.patch('/:id/cancel', authenticate, async (req, res, next) => {
     await appointment.save();
 
     if (appointment.paymentId) {
-        await Payment.findByIdAndUpdate(appointment.paymentId, { status: 'REFUNDED' });
+      await Payment.findByIdAndUpdate(appointment.paymentId, { status: 'REFUNDED' });
     }
 
     res.json({
@@ -293,7 +292,7 @@ router.post('/:id/review', authenticate, authorize('PATIENT'), async (req, res, 
       rating,
       comment,
     });
-    
+
     await review.save();
 
     const therapistProfile = await TherapistProfile.findById(appointment.therapistId);

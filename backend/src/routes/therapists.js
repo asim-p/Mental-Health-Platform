@@ -3,7 +3,6 @@ import User from '../models/User.js';
 import TherapistProfile from '../models/TherapistProfile.js';
 import Availability from '../models/Availability.js';
 import Appointment, { AppointmentStatus } from '../models/Appointment.js';
-import Review from '../models/Review.js';
 import { authenticate, authorize, optionalAuth } from '../middleware/auth.js';
 import { createError } from '../middleware/errorHandler.js';
 import { z } from 'zod';
@@ -26,7 +25,14 @@ router.get('/', optionalAuth, async (req, res, next) => {
     } = req.query;
 
     const where = {};
-    if (verified === 'true') where.isVerified = true;
+    // Enforce verified filter for non-admins
+    if (req.user?.role !== 'ADMIN') {
+      where.isVerified = true;
+    } else if (verified === 'false') {
+      where.isVerified = false;
+    } else if (verified === 'true') {
+      where.isVerified = true;
+    }
 
     if (specialty) where.specialization = { $in: [specialty] };
     if (language) where.languages = { $in: [language] };
@@ -91,75 +97,12 @@ router.get('/', optionalAuth, async (req, res, next) => {
   }
 });
 
-router.get('/:id', async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
-    const profile = await TherapistProfile.findOne({ user: id })
-      .populate('user', 'firstName lastName email phone')
-      .lean();
-
-    if (!profile) {
-      throw createError('Therapist not found', 404);
-    }
-
-    profile.id = profile._id.toString();
-    if(profile.user) profile.user.id = profile.user._id.toString();
-
-    profile.availability = await Availability.find({ therapistId: profile._id }).lean();
-    profile.reviews = await Review.find({ therapistId: profile._id }).sort({ createdAt: -1 }).limit(10).lean();
-
-    res.json({
-      success: true,
-      data: profile,
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-router.get('/:id/availability', async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { date } = req.query;
-
-    const profile = await TherapistProfile.findOne({ user: id }).lean();
-
-    if (!profile) {
-      throw createError('Therapist not found', 404);
-    }
-    
-    profile.availability = await Availability.find({ therapistId: profile._id }).lean();
-
-    const appointments = await Appointment.find({
-      therapistId: profile._id,
-      scheduledAt: {
-        $gte: new Date(date || new Date()),
-      },
-      status: { $ne: AppointmentStatus.CANCELLED },
-    }).select('scheduledAt').lean();
-
-    const bookedSlots = appointments.map((a) => a.scheduledAt.toISOString());
-
-    res.json({
-      success: true,
-      data: {
-        availability: profile.availability,
-        bookedSlots,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
 const updateAvailabilitySchema = z.object({
   availability: z.array(
     z.object({
       id: z.string().optional(),
       dayOfWeek: z.number().min(0).max(6),
-      startTime: z.string(),
-      endTime: z.string(),
+      time: z.string(),
       isAvailable: z.boolean(),
     })
   ),
@@ -180,8 +123,7 @@ router.patch('/availability', authenticate, authorize('THERAPIST'), async (req, 
     const newAvailability = data.availability.map((slot) => ({
       therapistId: profile._id,
       dayOfWeek: slot.dayOfWeek,
-      startTime: slot.startTime,
-      endTime: slot.endTime,
+      time: slot.time,
       isAvailable: slot.isAvailable
     }));
 
@@ -222,6 +164,67 @@ router.patch('/profile', authenticate, authorize('THERAPIST'), async (req, res, 
     if (!profile) {
       throw createError('Therapist profile not found', 404);
     }
+
+    res.json({
+      success: true,
+      data: profile,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/:id/availability', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { date } = req.query;
+
+    const profile = await TherapistProfile.findOne({ user: id }).lean();
+
+    if (!profile) {
+      throw createError('Therapist not found', 404);
+    }
+
+    profile.availability = await Availability.find({ therapistId: profile._id }).lean();
+
+    const appointments = await Appointment.find({
+      therapistId: profile._id,
+      scheduledAt: {
+        $gte: new Date(date || new Date()),
+      },
+      status: { $ne: AppointmentStatus.CANCELLED },
+    }).select('scheduledAt').lean();
+
+    const bookedSlots = appointments.map((a) => a.scheduledAt.toISOString());
+
+    res.json({
+      success: true,
+      data: {
+        availability: profile.availability,
+        bookedSlots,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const profile = await TherapistProfile.findOne({ user: id })
+      .populate('user', 'firstName lastName email phone')
+      .lean();
+
+    if (!profile) {
+      throw createError('Therapist not found', 404);
+    }
+
+    profile.id = profile._id.toString();
+    if (profile.user) profile.user.id = profile.user._id.toString();
+
+    profile.availability = await Availability.find({ therapistId: profile._id }).lean();
 
     res.json({
       success: true,

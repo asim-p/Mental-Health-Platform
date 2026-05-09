@@ -50,20 +50,7 @@ export function HowItWorksPage() {
           ))}
         </div>
 
-        <div className="mt-20 bg-primary/5 rounded-3xl p-8 md:p-12 border border-primary/10 text-center">
-          <h2 className="text-3xl font-bold mb-4">Ready to start?</h2>
-          <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Your journey towards mental wellness begins with a single step. Join thousands of others who have found support on our platform.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className="h-12 px-8 rounded-lg bg-primary text-primary-foreground font-bold hover:bg-primary/90 shadow-lg shadow-primary/20">
-              Find a Therapist
-            </button>
-            <button className="h-12 px-8 rounded-lg bg-border hover:bg-primary/10 font-bold border border-border">
-              Take AI Screening
-            </button>
-          </div>
-        </div>
+
       </main>
       <footer className="bg-card border-t border-border mt-auto">
         <div className="px-4 md:px-10 py-6 max-w-[1280px] mx-auto text-center text-sm text-muted-foreground">

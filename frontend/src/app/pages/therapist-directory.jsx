@@ -11,15 +11,13 @@ import { Search, Filter, Loader2 } from "lucide-react";
 import { api } from "../services/api.js";
 
 const specialties = [
+  "General Consultation",
   "Depression",
   "Anxiety",
-  "Relationship Issues",
-  "Trauma & PTSD",
-  "Stress Management",
-  "Family Counseling",
-  "Grief & Loss",
-  "OCD",
-  "Eating Disorders",
+  "Stress",
+  "Bipolar",
+  "Suicidal",
+  "Personality disorder",
 ];
 
 const languages = ["Nepali", "English", "Newari", "Maithili", "Bhojpuri"];

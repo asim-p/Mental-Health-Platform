@@ -20,16 +20,10 @@ export function LoginPage() {
     setIsLoading(true);
 
     try {
-      await login(email, password);
+      const user = await login(email, password);
       toast.success('Welcome back!');
 
-      const storedUser = localStorage.getItem('user');
-      let role = 'PATIENT';
-      try {
-        const userData = JSON.parse(storedUser || '{}');
-        role = userData.role || 'PATIENT';
-      } catch {}
-
+      const role = user?.role || 'PATIENT';
       navigate(`/dashboard/${role.toLowerCase()}`);
     } catch (error) {
       toast.error('Invalid email or password');
