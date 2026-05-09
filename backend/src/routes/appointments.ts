@@ -1,11 +1,15 @@
 import { Router, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import Appointment, { AppointmentStatus } from '../models/Appointment.js';
+import PatientProfile from '../models/PatientProfile.js';
+import TherapistProfile from '../models/TherapistProfile.js';
+import Payment from '../models/Payment.js';
+import ChatMessage from '../models/ChatMessage.js';
+import Review from '../models/Review.js';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
 import { createError } from '../middleware/errorHandler.js';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 
-const prisma = new PrismaClient();
 const router = Router();
 
 router.get('/', authenticate, async (req: AuthRequest, res: Response, next) => {
@@ -15,15 +19,11 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response, next) => {
     let where: any = {};
 
     if (req.user!.role === 'PATIENT') {
-      const profile = await prisma.patientProfile.findFirst({
-        where: { userId: req.user!.id },
-      });
-      where.patientId = profile?.id;
+      const profile = await PatientProfile.findOne({ user: req.user!.id });
+      where.patientId = profile?._id;
     } else if (req.user!.role === 'THERAPIST') {
-      const profile = await prisma.therapistProfile.findFirst({
-        where: { userId: req.user!.id },
-      });
-      where.therapistId = profile?.id;
+      const profile = await TherapistProfile.findOne({ user: req.user!.id });
+      where.therapistId = profile?._id;
     }
 
     if (status) {
@@ -31,44 +31,47 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response, next) => {
     }
 
     if (upcoming === 'true') {
-      where.scheduledAt = { gte: new Date() };
+      where.scheduledAt = { $gte: new Date() };
     }
 
-    const appointments = await prisma.appointment.findMany({
-      where,
-      include: {
-        patient: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-              },
-            },
-          },
-        },
-        therapist: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-              },
-            },
-          },
-        },
-        payment: true,
-      },
-      orderBy: { scheduledAt: upcoming === 'true' ? 'asc' : 'desc' },
+    const appointments = await Appointment.find(where)
+      .populate({
+        path: 'patientId',
+        populate: { path: 'user', select: 'firstName lastName email' }
+      })
+      .populate({
+        path: 'therapistId',
+        populate: { path: 'user', select: 'firstName lastName email' }
+      })
+      .populate('paymentId')
+      .sort({ scheduledAt: upcoming === 'true' ? 1 : -1 })
+      .lean();
+
+    const mappedAppointments = appointments.map((a: any) => {
+       a.id = a._id.toString();
+       if(a.patientId) {
+           a.patient = a.patientId;
+           a.patient.id = a.patient._id.toString();
+           if(a.patient.user) a.patient.user.id = a.patient.user._id.toString();
+           delete a.patientId;
+       }
+       if(a.therapistId) {
+           a.therapist = a.therapistId;
+           a.therapist.id = a.therapist._id.toString();
+           if(a.therapist.user) a.therapist.user.id = a.therapist.user._id.toString();
+           delete a.therapistId;
+       }
+       if(a.paymentId) {
+           a.payment = a.paymentId;
+           a.payment.id = a.payment._id.toString();
+           delete a.paymentId;
+       }
+       return a;
     });
 
     res.json({
       success: true,
-      data: appointments,
+      data: mappedAppointments,
     });
   } catch (error) {
     next(error);
@@ -79,44 +82,42 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response, next) =
   try {
     const { id } = req.params;
 
-    const appointment = await prisma.appointment.findUnique({
-      where: { id },
-      include: {
-        patient: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-              },
-            },
-          },
-        },
-        therapist: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-                phone: true,
-              },
-            },
-          },
-        },
-        payment: true,
-        chatMessages: {
-          orderBy: { createdAt: 'asc' },
-        },
-      },
-    });
+    const appointment: any = await Appointment.findById(id)
+      .populate({
+        path: 'patientId',
+        populate: { path: 'user', select: 'firstName lastName email' }
+      })
+      .populate({
+        path: 'therapistId',
+        populate: { path: 'user', select: 'firstName lastName email phone' }
+      })
+      .populate('paymentId')
+      .lean();
 
     if (!appointment) {
       throw createError('Appointment not found', 404);
     }
+
+    appointment.id = appointment._id.toString();
+    if(appointment.patientId) {
+       appointment.patient = appointment.patientId;
+       appointment.patient.id = appointment.patient._id.toString();
+       if(appointment.patient.user) appointment.patient.user.id = appointment.patient.user._id.toString();
+       delete appointment.patientId;
+    }
+    if(appointment.therapistId) {
+       appointment.therapist = appointment.therapistId;
+       appointment.therapist.id = appointment.therapist._id.toString();
+       if(appointment.therapist.user) appointment.therapist.user.id = appointment.therapist.user._id.toString();
+       delete appointment.therapistId;
+    }
+    if(appointment.paymentId) {
+       appointment.payment = appointment.paymentId;
+       appointment.payment.id = appointment.payment._id.toString();
+       delete appointment.paymentId;
+    }
+
+    appointment.chatMessages = await ChatMessage.find({ appointmentId: appointment._id }).sort({ createdAt: 1 }).lean();
 
     res.json({
       success: true,
@@ -138,21 +139,12 @@ router.post('/', authenticate, authorize('PATIENT'), async (req: AuthRequest, re
   try {
     const data = createAppointmentSchema.parse(req.body);
 
-    const patientProfile = await prisma.patientProfile.findFirst({
-      where: { userId: req.user!.id },
-    });
-
+    const patientProfile = await PatientProfile.findOne({ user: req.user!.id });
     if (!patientProfile) {
       throw createError('Patient profile not found', 404);
     }
 
-    const therapistProfile = await prisma.therapistProfile.findUnique({
-      where: { id: data.therapistId },
-      include: {
-        user: true,
-      },
-    });
-
+    const therapistProfile = await TherapistProfile.findById(data.therapistId).populate('user');
     if (!therapistProfile) {
       throw createError('Therapist not found', 404);
     }
@@ -161,58 +153,34 @@ router.post('/', authenticate, authorize('PATIENT'), async (req: AuthRequest, re
       throw createError('Therapist is not verified', 400);
     }
 
-    const existingAppointment = await prisma.appointment.findFirst({
-      where: {
-        therapistId: data.therapistId,
-        scheduledAt: new Date(data.scheduledAt),
-        status: { not: 'CANCELLED' },
-      },
+    const existingAppointment = await Appointment.findOne({
+      therapistId: data.therapistId,
+      scheduledAt: new Date(data.scheduledAt),
+      status: { $ne: AppointmentStatus.CANCELLED },
     });
 
     if (existingAppointment) {
       throw createError('This time slot is already booked', 400);
     }
 
-    const appointment = await prisma.appointment.create({
-      data: {
-        patientId: patientProfile.id,
-        therapistId: therapistProfile.id,
-        scheduledAt: new Date(data.scheduledAt),
-        notes: data.notes,
-        aiPrediction: data.aiPrediction,
-        status: 'PENDING',
-      },
-      include: {
-        patient: {
-          include: {
-            user: {
-              select: {
-                firstName: true,
-                lastName: true,
-              },
-            },
-          },
-        },
-        therapist: {
-          include: {
-            user: {
-              select: {
-                firstName: true,
-                lastName: true,
-              },
-            },
-          },
-        },
-      },
+    const appointment = new Appointment({
+      patientId: patientProfile._id,
+      therapistId: therapistProfile._id,
+      scheduledAt: new Date(data.scheduledAt),
+      notes: data.notes,
+      aiPrediction: data.aiPrediction,
+      status: 'PENDING',
     });
+    
+    const payment = new Payment({
+      appointmentId: appointment._id,
+      amount: therapistProfile.hourlyRate,
+      status: 'PENDING',
+    });
+    await payment.save();
 
-    await prisma.payment.create({
-      data: {
-        appointmentId: appointment.id,
-        amount: therapistProfile.hourlyRate,
-        status: 'PENDING',
-      },
-    });
+    appointment.paymentId = payment._id;
+    await appointment.save();
 
     res.status(201).json({
       success: true,
@@ -227,14 +195,11 @@ router.patch('/:id/confirm', authenticate, authorize('THERAPIST', 'ADMIN'), asyn
   try {
     const { id } = req.params;
 
-    const appointment = await prisma.appointment.update({
-      where: { id },
-      data: {
+    const appointment = await Appointment.findByIdAndUpdate(id, {
         status: 'CONFIRMED',
         zoomMeetingUrl: `https://zoom.us/j/${uuidv4().replace(/-/g, '').substring(0, 10)}`,
         zoomJoinUrl: `https://zoom.us/j/${uuidv4().replace(/-/g, '').substring(0, 10)}`,
-      },
-    });
+    }, { new: true });
 
     res.json({
       success: true,
@@ -249,10 +214,7 @@ router.patch('/:id/complete', authenticate, authorize('THERAPIST'), async (req: 
   try {
     const { id } = req.params;
 
-    const appointment = await prisma.appointment.update({
-      where: { id },
-      data: { status: 'COMPLETED' },
-    });
+    const appointment = await Appointment.findByIdAndUpdate(id, { status: 'COMPLETED' }, { new: true });
 
     res.json({
       success: true,
@@ -268,39 +230,33 @@ router.patch('/:id/cancel', authenticate, async (req: AuthRequest, res: Response
     const { id } = req.params;
     const { reason } = req.body;
 
-    const appointment = await prisma.appointment.findUnique({
-      where: { id },
-    });
+    const appointment = await Appointment.findById(id);
 
     if (!appointment) {
       throw createError('Appointment not found', 404);
     }
 
-    const isPatient = appointment.patientId === (await prisma.patientProfile.findFirst({ where: { userId: req.user!.id } }))?.id;
-    const isTherapist = appointment.therapistId === (await prisma.therapistProfile.findFirst({ where: { userId: req.user!.id } }))?.id;
+    const patientProfile = await PatientProfile.findOne({ user: req.user!.id });
+    const therapistProfile = await TherapistProfile.findOne({ user: req.user!.id });
+
+    const isPatient = appointment.patientId.toString() === patientProfile?._id.toString();
+    const isTherapist = appointment.therapistId.toString() === therapistProfile?._id.toString();
 
     if (!isPatient && !isTherapist && req.user!.role !== 'ADMIN') {
       throw createError('Not authorized to cancel this appointment', 403);
     }
 
-    const updated = await prisma.appointment.update({
-      where: { id },
-      data: {
-        status: 'CANCELLED',
-        notes: reason ? `${appointment.notes || ''}\nCancellation reason: ${reason}` : appointment.notes,
-      },
-    });
+    appointment.status = 'CANCELLED' as any;
+    appointment.notes = reason ? `${appointment.notes || ''}\nCancellation reason: ${reason}` : appointment.notes;
+    await appointment.save();
 
-    if (appointment.payment) {
-      await prisma.payment.update({
-        where: { appointmentId: id },
-        data: { status: 'REFUNDED' },
-      });
+    if (appointment.paymentId) {
+        await Payment.findByIdAndUpdate(appointment.paymentId, { status: 'REFUNDED' });
     }
 
     res.json({
       success: true,
-      data: updated,
+      data: appointment,
     });
   } catch (error) {
     next(error);
@@ -312,55 +268,43 @@ router.post('/:id/review', authenticate, authorize('PATIENT'), async (req: AuthR
     const { id } = req.params;
     const { rating, comment } = req.body;
 
-    const appointment = await prisma.appointment.findUnique({
-      where: { id },
-    });
+    const appointment = await Appointment.findById(id);
 
     if (!appointment || appointment.status !== 'COMPLETED') {
       throw createError('Cannot review incomplete appointment', 400);
     }
 
-    const patientProfile = await prisma.patientProfile.findFirst({
-      where: { userId: req.user!.id },
-    });
+    const patientProfile = await PatientProfile.findOne({ user: req.user!.id });
 
-    if (appointment.patientId !== patientProfile?.id) {
+    if (appointment.patientId.toString() !== patientProfile?._id.toString()) {
       throw createError('Not authorized to review this appointment', 403);
     }
 
-    const existingReview = await prisma.review.findUnique({
-      where: { appointmentId: id },
-    });
+    const existingReview = await Review.findOne({ appointmentId: id });
 
     if (existingReview) {
       throw createError('Already reviewed this appointment', 400);
     }
 
-    const review = await prisma.review.create({
-      data: {
-        appointmentId: id,
-        therapistId: appointment.therapistId,
-        patientId: patientProfile!.id,
-        rating,
-        comment,
-      },
+    const review = new Review({
+      appointmentId: id,
+      therapistId: appointment.therapistId,
+      patientId: patientProfile!._id,
+      rating,
+      comment,
     });
+    
+    await review.save();
 
-    const therapistProfile = await prisma.therapistProfile.findUnique({
-      where: { id: appointment.therapistId },
-    });
+    const therapistProfile = await TherapistProfile.findById(appointment.therapistId);
 
     if (therapistProfile) {
       const totalRating = therapistProfile.rating * therapistProfile.reviewCount + rating;
       const newReviewCount = therapistProfile.reviewCount + 1;
 
-      await prisma.therapistProfile.update({
-        where: { id: appointment.therapistId },
-        data: {
-          rating: totalRating / newReviewCount,
-          reviewCount: newReviewCount,
-        },
-      });
+      therapistProfile.rating = totalRating / newReviewCount;
+      therapistProfile.reviewCount = newReviewCount;
+      await therapistProfile.save();
     }
 
     res.status(201).json({

@@ -26,33 +26,31 @@ def load_models():
         category_mapping = {
             0: {
                 'category': 'Normal',
-                'description': 'No significant mental health concerns detected',
-                'specializations': ['Wellness Coaching']
+                'description': 'No significant mental health concerns detected. You appear to be managing well.'
             },
             1: {
                 'category': 'Depression',
-                'description': 'Symptoms consistent with depression',
-                'specializations': ['Depression', 'Clinical Psychology', 'Psychiatry']
+                'description': 'A mood disorder causing persistent feelings of sadness and loss of interest.'
             },
             2: {
                 'category': 'Anxiety',
-                'description': 'Symptoms consistent with anxiety disorder',
-                'specializations': ['Anxiety', 'Clinical Psychology', 'Psychiatry']
+                'description': 'Excessive worry and fear that interferes with daily activities.'
             },
             3: {
                 'category': 'Stress',
-                'description': 'Elevated stress levels detected',
-                'specializations': ['Stress Management', 'Counseling Psychology']
+                'description': 'Elevated stress levels that may benefit from management techniques.'
             },
             4: {
                 'category': 'Bipolar',
-                'description': 'Symptoms may indicate bipolar disorder',
-                'specializations': ['Bipolar Disorder', 'Psychiatry', 'Clinical Psychology']
+                'description': 'Symptoms may indicate mood swings between emotional highs and lows.'
             },
             5: {
-                'category': 'PTSD',
-                'description': 'Symptoms consistent with post-traumatic stress',
-                'specializations': ['Trauma', 'PTSD', 'Clinical Psychology']
+                'category': 'Suicidal',
+                'description': 'Signs of severe distress and suicidal ideation. Please seek immediate help.'
+            },
+            6: {
+                'category': 'Personality disorder',
+                'description': 'Symptoms consistent with personality-related concerns requiring professional evaluation.'
             }
         }
 
@@ -95,18 +93,12 @@ def predict():
         else:
             result = {
                 'category': f'Category_{prediction}',
-                'description': 'Mental health concern detected',
-                'specializations': ['General Mental Health']
+                'description': 'Mental health concern detected'
             }
         
         return jsonify({
             'category': result['category'],
-            'confidence': confidence,
-            'description': result['description'],
-            'recommendedSpecializations': result['specializations'],
-            'all_probabilities': {
-                cat: float(prob) for cat, prob in zip(range(len(prediction_proba)), prediction_proba)
-            }
+            'description': result['description']
         })
         
     except Exception as e:

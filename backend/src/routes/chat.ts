@@ -1,49 +1,48 @@
 import { Router, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import Appointment from '../models/Appointment.js';
+import PatientProfile from '../models/PatientProfile.js';
+import TherapistProfile from '../models/TherapistProfile.js';
+import ChatMessage from '../models/ChatMessage.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { createError } from '../middleware/errorHandler.js';
 import { io } from '../index.js';
 
-const prisma = new PrismaClient();
 const router = Router();
 
 router.get('/:appointmentId', authenticate, async (req: AuthRequest, res: Response, next) => {
   try {
     const { appointmentId } = req.params;
 
-    const appointment = await prisma.appointment.findUnique({
-      where: { id: appointmentId },
-    });
+    const appointment = await Appointment.findById(appointmentId);
 
     if (!appointment) {
       throw createError('Appointment not found', 404);
     }
 
-    const patientProfile = await prisma.patientProfile.findFirst({
-      where: { userId: req.user!.id },
-    });
-
-    const therapistProfile = await prisma.therapistProfile.findFirst({
-      where: { userId: req.user!.id },
-    });
+    const patientProfile = await PatientProfile.findOne({ user: req.user!.id });
+    const therapistProfile = await TherapistProfile.findOne({ user: req.user!.id });
 
     const isAuthorized =
-      appointment.patientId === patientProfile?.id ||
-      appointment.therapistId === therapistProfile?.id ||
+      appointment.patientId.toString() === patientProfile?._id.toString() ||
+      appointment.therapistId.toString() === therapistProfile?._id.toString() ||
       req.user!.role === 'ADMIN';
 
     if (!isAuthorized) {
       throw createError('Not authorized to view this chat', 403);
     }
 
-    const messages = await prisma.chatMessage.findMany({
-      where: { appointmentId },
-      orderBy: { createdAt: 'asc' },
+    const messages = await ChatMessage.find({ appointmentId })
+      .sort({ createdAt: 1 })
+      .lean();
+
+    const mappedMessages = messages.map((m: any) => {
+        m.id = m._id.toString();
+        return m;
     });
 
     res.json({
       success: true,
-      data: messages,
+      data: mappedMessages,
     });
   } catch (error) {
     next(error);
@@ -59,44 +58,40 @@ router.post('/:appointmentId', authenticate, async (req: AuthRequest, res: Respo
       throw createError('Message content required', 400);
     }
 
-    const appointment = await prisma.appointment.findUnique({
-      where: { id: appointmentId },
-    });
+    const appointment = await Appointment.findById(appointmentId);
 
     if (!appointment) {
       throw createError('Appointment not found', 404);
     }
 
-    const patientProfile = await prisma.patientProfile.findFirst({
-      where: { userId: req.user!.id },
-    });
+    const patientProfile = await PatientProfile.findOne({ user: req.user!.id });
+    const therapistProfile = await TherapistProfile.findOne({ user: req.user!.id });
 
-    const therapistProfile = await prisma.therapistProfile.findFirst({
-      where: { userId: req.user!.id },
-    });
-
-    const isPatient = patientProfile && appointment.patientId === patientProfile.id;
-    const isTherapist = therapistProfile && appointment.therapistId === therapistProfile.id;
+    const isPatient = patientProfile && appointment.patientId.toString() === patientProfile._id.toString();
+    const isTherapist = therapistProfile && appointment.therapistId.toString() === therapistProfile._id.toString();
 
     if (!isPatient && !isTherapist) {
       throw createError('Not authorized to send messages', 403);
     }
 
-    const message = await prisma.chatMessage.create({
-      data: {
-        appointmentId,
-        patientId: appointment.patientId,
-        therapistId: appointment.therapistId,
-        senderType: isPatient ? 'PATIENT' : 'THERAPIST',
-        content: content.trim(),
-      },
+    const message = new ChatMessage({
+      appointmentId,
+      patientId: appointment.patientId,
+      therapistId: appointment.therapistId,
+      senderType: isPatient ? 'PATIENT' : 'THERAPIST',
+      content: content.trim(),
     });
+    
+    await message.save();
 
-    io.to(`appointment:${appointmentId}`).emit('new_message', message);
+    const messageData: any = message.toObject();
+    messageData.id = messageData._id.toString();
+
+    io.to(`appointment:${appointmentId}`).emit('new_message', messageData);
 
     res.status(201).json({
       success: true,
-      data: message,
+      data: messageData,
     });
   } catch (error) {
     next(error);
@@ -107,10 +102,11 @@ router.patch('/:messageId/read', authenticate, async (req: AuthRequest, res: Res
   try {
     const { messageId } = req.params;
 
-    const message = await prisma.chatMessage.update({
-      where: { id: messageId },
-      data: { isRead: true },
-    });
+    const message = await ChatMessage.findByIdAndUpdate(messageId, { isRead: true }, { new: true }).lean();
+
+    if(message) {
+        (message as any).id = message._id.toString();
+    }
 
     res.json({
       success: true,

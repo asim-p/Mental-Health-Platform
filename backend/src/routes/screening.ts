@@ -1,11 +1,13 @@
 import { Router, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import PatientProfile from '../models/PatientProfile.js';
+import ScreeningResult from '../models/ScreeningResult.js';
+import TherapistProfile from '../models/TherapistProfile.js';
+import Availability from '../models/Availability.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { createError } from '../middleware/errorHandler.js';
 import { z } from 'zod';
 import fetch from 'node-fetch';
 
-const prisma = new PrismaClient();
 const router = Router();
 
 router.post('/predict', authenticate, async (req: AuthRequest, res: Response, next) => {
@@ -30,29 +32,21 @@ router.post('/predict', authenticate, async (req: AuthRequest, res: Response, ne
 
     const result = await aiResponse.json() as {
       category: string;
-      confidence: number;
-      recommendedSpecializations: string[];
+      description: string;
     };
-
-    const patientProfile = await prisma.patientProfile.findFirst({
-      where: { userId: req.user!.id },
-    });
-
+    
+    const patientProfile = await PatientProfile.findOne({ user: req.user!.id });
+    
     if (patientProfile) {
-      await prisma.patientProfile.update({
-        where: { id: patientProfile.id },
-        data: { lastScreeningAt: new Date() },
+      patientProfile.lastScreeningAt = new Date();
+      await patientProfile.save();
+    
+      const screeningResult = new ScreeningResult({
+        patientId: patientProfile._id,
+        inputText: text,
+        predictedCategory: result.category,
       });
-
-      await prisma.screeningResult.create({
-        data: {
-          patientId: patientProfile.id,
-          inputText: text,
-          predictedCategory: result.category,
-          confidence: result.confidence,
-          recommendedSpecializations: result.recommendedSpecializations,
-        },
-      });
+      await screeningResult.save();
     }
 
     res.json({
@@ -66,22 +60,24 @@ router.post('/predict', authenticate, async (req: AuthRequest, res: Response, ne
 
 router.get('/history', authenticate, async (req: AuthRequest, res: Response, next) => {
   try {
-    const patientProfile = await prisma.patientProfile.findFirst({
-      where: { userId: req.user!.id },
-    });
+    const patientProfile = await PatientProfile.findOne({ user: req.user!.id });
 
     if (!patientProfile) {
       throw createError('Patient profile not found', 404);
     }
 
-    const results = await prisma.screeningResult.findMany({
-      where: { patientId: patientProfile.id },
-      orderBy: { createdAt: 'desc' },
+    const results = await ScreeningResult.find({ patientId: patientProfile._id })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const mappedResults = results.map((r: any) => {
+        r.id = r._id.toString();
+        return r;
     });
 
     res.json({
       success: true,
-      data: results,
+      data: mappedResults,
     });
   } catch (error) {
     next(error);
@@ -97,7 +93,7 @@ router.get('/recommendations', authenticate, async (req: AuthRequest, res: Respo
     };
 
     if (category) {
-      where.specialization = { hasSome: [category as string] };
+      where.specialization = { $in: [category as string] };
     }
 
     if (gender) {
@@ -105,33 +101,29 @@ router.get('/recommendations', authenticate, async (req: AuthRequest, res: Respo
     }
 
     if (language) {
-      where.languages = { hasSome: [language as string] };
+      where.languages = { $in: [language as string] };
     }
 
     if (budget) {
-      where.hourlyRate = { lte: parseFloat(budget as string) };
+      where.hourlyRate = { $lte: parseFloat(budget as string) };
     }
 
-    const therapists = await prisma.therapistProfile.findMany({
-      where,
-      include: {
-        user: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-        availability: true,
-      },
-      orderBy: { rating: 'desc' },
-      take: 10,
-    });
+    const therapists = await TherapistProfile.find(where)
+      .populate('user', 'firstName lastName email')
+      .sort({ rating: -1 })
+      .limit(10)
+      .lean();
+
+    const populatedTherapists = await Promise.all(therapists.map(async (t: any) => {
+      t.id = t._id.toString();
+      t.user.id = t.user._id.toString();
+      t.availability = await Availability.find({ therapistId: t._id }).lean();
+      return t;
+    }));
 
     res.json({
       success: true,
-      data: therapists,
+      data: populatedTherapists,
     });
   } catch (error) {
     next(error);

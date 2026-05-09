@@ -130,14 +130,6 @@ export function TherapistDashboard() {
               <h1 className="text-3xl font-bold text-foreground">
                 Dr. {user?.firstName} {user?.lastName}
               </h1>
-              {profile?.isVerified ? (
-                <Badge className="bg-green-100 text-green-700 gap-1">
-                  <CheckCircle size={14} />
-                  Verified
-                </Badge>
-              ) : (
-                <Badge className="bg-yellow-100 text-yellow-700">Pending Verification</Badge>
-              )}
             </div>
             <p className="text-muted-foreground">
               {profile?.specialization?.join(', ') || 'Mental Health Professional'}
@@ -347,34 +339,15 @@ export function TherapistDashboard() {
                 <DollarSign size={16} />
                 Update Pricing
               </Button>
-              <Button variant="outline" className="w-full justify-start gap-2">
-                <Calendar size={16} />
-                Set Availability
+              <Button variant="outline" className="w-full justify-start gap-2" asChild>
+                <Link to="/dashboard/therapist/availability">
+                  <Calendar size={16} />
+                  Set Availability
+                </Link>
               </Button>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Reviews</CardTitle>
-              <CardDescription>Client feedback</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-4 mb-4">
-                <div className="flex items-center gap-2">
-                  <Star className="text-yellow-500 fill-yellow-500" size={24} />
-                  <span className="text-2xl font-bold">{profile?.rating || 0}</span>
-                  <span className="text-muted-foreground">
-                    ({profile?.reviewCount || 0} reviews)
-                  </span>
-                </div>
-              </div>
-              <div className="border-2 border-dashed rounded-lg p-8 text-center text-muted-foreground">
-                <p className="mb-3">View all client reviews</p>
-                <p className="text-sm">See what your clients say about you</p>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </div>
     </div>

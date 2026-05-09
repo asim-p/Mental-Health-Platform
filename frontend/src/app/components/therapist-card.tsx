@@ -4,12 +4,16 @@ import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Star, Languages, DollarSign, CheckCircle } from "lucide-react";
 import { Therapist } from "../data/therapists";
+import { useAuth } from "../context/AuthContext";
 
 interface TherapistCardProps {
   therapist: Therapist;
 }
 
 export function TherapistCard({ therapist }: TherapistCardProps) {
+  const { user } = useAuth();
+  const isTherapist = user?.role === 'THERAPIST';
+
   return (
     <Card className="hover:shadow-xl transition-all hover:-translate-y-0.5 duration-300 border border-border">
       <CardContent className="pt-6">
@@ -28,12 +32,7 @@ export function TherapistCard({ therapist }: TherapistCardProps) {
             </div>
             <p className="text-sm text-muted-foreground mb-2">{therapist.title}</p>
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <Star className="text-yellow-500 fill-yellow-500" size={14} />
-                <span className="font-medium">{therapist.rating}</span>
-              </div>
-              <span>•</span>
-              <span>{therapist.totalSessions} sessions</span>
+              <span>{therapist.totalSessions || 0} sessions completed</span>
             </div>
           </div>
         </div>
@@ -81,13 +80,15 @@ export function TherapistCard({ therapist }: TherapistCardProps) {
         </p>
       </CardContent>
 
-      <CardFooter>
-        <Link to={`/book/${therapist.id}`} className="w-full">
-          <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
-            Book Appointment
-          </Button>
-        </Link>
-      </CardFooter>
+      {!isTherapist && (
+        <CardFooter>
+          <Link to={`/book/${therapist.id}`} className="w-full">
+            <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
+              Book Appointment
+            </Button>
+          </Link>
+        </CardFooter>
+      )}
     </Card>
   );
 }

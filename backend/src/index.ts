@@ -12,7 +12,13 @@ import chatRoutes from './routes/chat.js';
 import paymentRoutes from './routes/payments.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
+import mongoose from 'mongoose';
+
 dotenv.config();
+
+mongoose.connect(process.env.DATABASE_URL as string)
+  .then(() => console.log('Connected to MongoDB'))
+  .catch((err) => console.error('MongoDB connection error:', err));
 
 const app = express();
 const httpServer = createServer(app);

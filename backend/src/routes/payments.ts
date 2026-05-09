@@ -1,42 +1,35 @@
 import { Router, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import Appointment from '../models/Appointment.js';
+import PatientProfile from '../models/PatientProfile.js';
+import Payment from '../models/Payment.js';
+import TherapistProfile from '../models/TherapistProfile.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { createError } from '../middleware/errorHandler.js';
 import { createHmac } from 'crypto';
 import { z } from 'zod';
 
-const prisma = new PrismaClient();
 const router = Router();
 
 router.post('/initiate', authenticate, async (req: AuthRequest, res: Response, next) => {
   try {
     const { appointmentId } = req.body;
 
-    const appointment = await prisma.appointment.findUnique({
-      where: { id: appointmentId },
-      include: {
-        therapist: true,
-        payment: true,
-      },
-    });
+    const appointment = await Appointment.findById(appointmentId).populate('therapistId').populate('paymentId').lean();
 
-    if (!appointment) {
-      throw createError('Appointment not found', 404);
-    }
+    if (!appointment) throw createError('Appointment not found', 404);
 
-    const patientProfile = await prisma.patientProfile.findFirst({
-      where: { userId: req.user!.id },
-    });
+    const patientProfile = await PatientProfile.findOne({ user: req.user!.id });
 
-    if (appointment.patientId !== patientProfile?.id) {
+    if (appointment.patientId.toString() !== patientProfile?._id.toString()) {
       throw createError('Not authorized', 403);
     }
 
-    if (appointment.payment?.status === 'COMPLETED') {
+    if ((appointment.paymentId as any)?.status === 'COMPLETED') {
       throw createError('Payment already completed', 400);
     }
 
-    const amount = Number(appointment.therapist.hourlyRate);
+    const therapistProfile = await TherapistProfile.findById(appointment.therapistId);
+    const amount = Number(therapistProfile?.hourlyRate || 0);
     const uuid = `MHP${Date.now()}`;
 
     const signaturePayload = `merchant_id=MHP001|merchant_key=MHP001_KEY|total_amount=${amount}|transaction_uuid=${uuid}`;
@@ -80,34 +73,21 @@ router.post('/verify', async (req, res, next) => {
       throw createError('Payment failed', 400);
     }
 
-    const payment = await prisma.payment.findFirst({
-      where: {
-        transactionId: transaction_uuid,
-      },
-    });
+    const payment = await Payment.findOne({ transactionId: transaction_uuid });
 
-    if (!payment) {
-      throw createError('Payment not found', 404);
-    }
+    if (!payment) throw createError('Payment not found', 404);
 
     if (Number(amt) !== Number(payment.amount)) {
       throw createError('Amount mismatch', 400);
     }
 
-    await prisma.payment.update({
-      where: { id: payment.id },
-      data: {
-        status: 'COMPLETED',
-        esewaRefId: refId,
-        esewaTimestamp: new Date(),
-        transactionId: transaction_uuid,
-      },
-    });
+    payment.status = 'COMPLETED' as any;
+    payment.esewaRefId = refId;
+    payment.esewaTimestamp = new Date();
+    payment.transactionId = transaction_uuid;
+    await payment.save();
 
-    await prisma.appointment.update({
-      where: { id: payment.appointmentId },
-      data: { status: 'CONFIRMED' },
-    });
+    await Appointment.findByIdAndUpdate(payment.appointmentId, { status: 'CONFIRMED' });
 
     res.json({
       success: true,
@@ -122,13 +102,9 @@ router.get('/:appointmentId', authenticate, async (req: AuthRequest, res: Respon
   try {
     const { appointmentId } = req.params;
 
-    const payment = await prisma.payment.findUnique({
-      where: { appointmentId },
-    });
+    const payment = await Payment.findOne({ appointmentId });
 
-    if (!payment) {
-      throw createError('Payment not found', 404);
-    }
+    if (!payment) throw createError('Payment not found', 404);
 
     res.json({
       success: true,
@@ -143,27 +119,18 @@ router.post('/refund/:appointmentId', authenticate, async (req: AuthRequest, res
   try {
     const { appointmentId } = req.params;
 
-    const payment = await prisma.payment.findUnique({
-      where: { appointmentId },
-    });
+    const payment = await Payment.findOne({ appointmentId });
 
-    if (!payment) {
-      throw createError('Payment not found', 404);
-    }
+    if (!payment) throw createError('Payment not found', 404);
 
     if (payment.status !== 'COMPLETED') {
       throw createError('Payment not eligible for refund', 400);
     }
 
-    await prisma.payment.update({
-      where: { id: payment.id },
-      data: { status: 'REFUNDED' },
-    });
+    payment.status = 'REFUNDED' as any;
+    await payment.save();
 
-    await prisma.appointment.update({
-      where: { id: appointmentId },
-      data: { status: 'CANCELLED' },
-    });
+    await Appointment.findByIdAndUpdate(appointmentId, { status: 'CANCELLED' });
 
     res.json({
       success: true,

@@ -1,28 +1,34 @@
 import { Router, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import User, { UserRole } from '../models/User.js';
+import PatientProfile from '../models/PatientProfile.js';
+import TherapistProfile from '../models/TherapistProfile.js';
+import Availability from '../models/Availability.js';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
 import { createError } from '../middleware/errorHandler.js';
 import { z } from 'zod';
 
-const prisma = new PrismaClient();
 const router = Router();
 
 router.get('/profile', authenticate, async (req: AuthRequest, res: Response, next) => {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user!.id },
-      include: {
-        patientProfile: true,
-        therapistProfile: {
-          include: {
-            availability: true,
-          },
-        },
-      },
-    });
+    const user = await User.findById(req.user!.id);
 
     if (!user) {
       throw createError('User not found', 404);
+    }
+
+    let profile: any = null;
+    if (user.role === UserRole.PATIENT) {
+      profile = await PatientProfile.findOne({ user: user._id }).lean();
+    } else if (user.role === UserRole.THERAPIST) {
+      profile = await TherapistProfile.findOne({ user: user._id }).lean();
+      if (profile) {
+        profile.availability = await Availability.find({ therapistId: profile._id }).lean();
+      }
+    }
+
+    if (profile) {
+        profile.id = profile._id.toString();
     }
 
     res.json({
@@ -35,7 +41,7 @@ router.get('/profile', authenticate, async (req: AuthRequest, res: Response, nex
           lastName: user.lastName,
           phone: user.phone,
           role: user.role,
-          profile: user.patientProfile || user.therapistProfile,
+          profile: profile,
         },
       },
     });
@@ -61,30 +67,23 @@ router.patch('/profile', authenticate, async (req: AuthRequest, res: Response, n
   try {
     const data = updateProfileSchema.parse(req.body);
 
-    const user = await prisma.user.update({
-      where: { id: req.user!.id },
-      data: {
-        firstName: data.firstName,
-        lastName: data.lastName,
-        phone: data.phone,
-      },
-      include: {
-        patientProfile: true,
-        therapistProfile: true,
-      },
-    });
+    const user = await User.findByIdAndUpdate(req.user!.id, {
+      firstName: data.firstName,
+      lastName: data.lastName,
+      phone: data.phone,
+    }, { new: true });
 
-    if (user.role === 'PATIENT' && user.patientProfile && data.profileData) {
-      await prisma.patientProfile.update({
-        where: { id: user.patientProfile.id },
-        data: {
+    if (user && user.role === UserRole.PATIENT && data.profileData) {
+      await PatientProfile.findOneAndUpdate(
+        { user: user._id },
+        {
           dateOfBirth: data.profileData.dateOfBirth ? new Date(data.profileData.dateOfBirth) : undefined,
           gender: data.profileData.gender,
           address: data.profileData.address,
           emergencyContact: data.profileData.emergencyContact,
           preferredLanguage: data.profileData.preferredLanguage,
-        },
-      });
+        }
+      );
     }
 
     res.json({
@@ -98,16 +97,18 @@ router.patch('/profile', authenticate, async (req: AuthRequest, res: Response, n
 
 router.get('/patients', authenticate, authorize('ADMIN', 'THERAPIST'), async (req: AuthRequest, res: Response, next) => {
   try {
-    const patients = await prisma.user.findMany({
-      where: { role: 'PATIENT' },
-      include: {
-        patientProfile: true,
-      },
-    });
+    const patients = await User.find({ role: UserRole.PATIENT }).lean();
+    const profiles = await PatientProfile.find({ user: { $in: patients.map(p => p._id) } }).lean();
+
+    const data = patients.map(p => ({
+      ...p,
+      id: p._id.toString(),
+      patientProfile: profiles.find(profile => profile.user.toString() === p._id.toString())
+    }));
 
     res.json({
       success: true,
-      data: patients,
+      data,
     });
   } catch (error) {
     next(error);
@@ -116,16 +117,18 @@ router.get('/patients', authenticate, authorize('ADMIN', 'THERAPIST'), async (re
 
 router.get('/therapists', authenticate, authorize('ADMIN'), async (req: AuthRequest, res: Response, next) => {
   try {
-    const therapists = await prisma.user.findMany({
-      where: { role: 'THERAPIST' },
-      include: {
-        therapistProfile: true,
-      },
-    });
+    const therapists = await User.find({ role: UserRole.THERAPIST }).lean();
+    const profiles = await TherapistProfile.find({ user: { $in: therapists.map(t => t._id) } }).lean();
+
+    const data = therapists.map(t => ({
+      ...t,
+      id: t._id.toString(),
+      therapistProfile: profiles.find(profile => profile.user.toString() === t._id.toString())
+    }));
 
     res.json({
       success: true,
-      data: therapists,
+      data,
     });
   } catch (error) {
     next(error);
@@ -141,21 +144,15 @@ router.patch('/therapists/:id/verify', authenticate, authorize('ADMIN'), async (
       throw createError('Invalid action', 400);
     }
 
-    const therapistProfile = await prisma.therapistProfile.findFirst({
-      where: { userId: id },
-    });
+    const therapistProfile = await TherapistProfile.findOne({ user: id });
 
     if (!therapistProfile) {
       throw createError('Therapist profile not found', 404);
     }
 
-    await prisma.therapistProfile.update({
-      where: { id: therapistProfile.id },
-      data: {
-        isVerified: action === 'APPROVE',
-        verificationStatus: action === 'APPROVE' ? 'APPROVED' : 'REJECTED',
-      },
-    });
+    therapistProfile.isVerified = action === 'APPROVE';
+    therapistProfile.verificationStatus = action === 'APPROVE' ? 'APPROVED' : 'REJECTED';
+    await therapistProfile.save();
 
     res.json({
       success: true,
@@ -170,9 +167,9 @@ router.delete('/users/:id', authenticate, authorize('ADMIN'), async (req: AuthRe
   try {
     const { id } = req.params;
 
-    await prisma.user.delete({
-      where: { id },
-    });
+    await User.findByIdAndDelete(id);
+    await PatientProfile.findOneAndDelete({ user: id });
+    await TherapistProfile.findOneAndDelete({ user: id });
 
     res.json({
       success: true,

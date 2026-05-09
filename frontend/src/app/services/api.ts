@@ -325,8 +325,6 @@ export interface ScreeningResult {
   id: string;
   inputText: string;
   predictedCategory: string;
-  confidence: number;
-  recommendedSpecializations: string[];
   createdAt: string;
 }
 

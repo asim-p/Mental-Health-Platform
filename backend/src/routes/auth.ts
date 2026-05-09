@@ -1,12 +1,13 @@
 import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
+import User from '../models/User.js';
+import PatientProfile from '../models/PatientProfile.js';
+import TherapistProfile from '../models/TherapistProfile.js';
 import { z } from 'zod';
 import { createError } from '../middleware/errorHandler.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 
-const prisma = new PrismaClient();
 const router = Router();
 
 const registerSchema = z.object({
@@ -38,9 +39,7 @@ router.post('/register', async (req, res, next) => {
   try {
     const data = registerSchema.parse(req.body);
 
-    const existingUser = await prisma.user.findUnique({
-      where: { email: data.email },
-    });
+    const existingUser = await User.findOne({ email: data.email });
 
     if (existingUser) {
       throw createError('Email already registered', 400);
@@ -48,40 +47,36 @@ router.post('/register', async (req, res, next) => {
 
     const hashedPassword = await bcrypt.hash(data.password, 12);
 
-    const user = await prisma.user.create({
-      data: {
-        email: data.email,
-        password: hashedPassword,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        phone: data.phone,
-        role: data.role,
-        ...(data.role === 'PATIENT' && {
-          patientProfile: {
-            create: {},
-          },
-        }),
-        ...(data.role === 'THERAPIST' && {
-          therapistProfile: {
-            create: {
-              specialization: data.therapistData?.specialization || [],
-              qualifications: data.therapistData?.qualifications || [],
-              yearsOfExperience: data.therapistData?.yearsOfExperience || 0,
-              bio: data.therapistData?.bio,
-              hourlyRate: data.therapistData?.hourlyRate || 1500,
-              gender: data.therapistData?.gender,
-              languages: data.therapistData?.languages || ['Nepali'],
-              credentials: data.therapistData?.credentials,
-              licenseNumber: data.therapistData?.licenseNumber,
-            },
-          },
-        }),
-      },
-      include: {
-        patientProfile: true,
-        therapistProfile: true,
-      },
+    const user = new User({
+      email: data.email,
+      password: hashedPassword,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      phone: data.phone,
+      role: data.role,
     });
+    await user.save();
+
+    let profile = null;
+
+    if (data.role === 'PATIENT') {
+      profile = new PatientProfile({ user: user._id });
+      await profile.save();
+    } else if (data.role === 'THERAPIST') {
+      profile = new TherapistProfile({
+        user: user._id,
+        specialization: data.therapistData?.specialization || [],
+        qualifications: data.therapistData?.qualifications || [],
+        yearsOfExperience: data.therapistData?.yearsOfExperience || 0,
+        bio: data.therapistData?.bio,
+        hourlyRate: data.therapistData?.hourlyRate || 1500,
+        gender: data.therapistData?.gender,
+        languages: data.therapistData?.languages || ['Nepali'],
+        credentials: data.therapistData?.credentials,
+        licenseNumber: data.therapistData?.licenseNumber,
+      });
+      await profile.save();
+    }
 
     const accessToken = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
@@ -118,22 +113,27 @@ router.post('/login', async (req, res, next) => {
   try {
     const data = loginSchema.parse(req.body);
 
-    const user = await prisma.user.findUnique({
-      where: { email: data.email },
-      include: {
-        patientProfile: true,
-        therapistProfile: true,
-      },
-    });
+    const user = await User.findOne({ email: data.email });
 
     if (!user) {
       throw createError('Invalid credentials', 401);
     }
 
-    const isValidPassword = await bcrypt.compare(data.password, user.password);
+    const isValidPassword = await bcrypt.compare(data.password, user.password as string);
 
     if (!isValidPassword) {
       throw createError('Invalid credentials', 401);
+    }
+
+    let profile = null;
+    if (user.role === 'PATIENT') {
+        profile = await PatientProfile.findOne({ user: user._id }).lean();
+    } else {
+        profile = await TherapistProfile.findOne({ user: user._id }).lean();
+    }
+
+    if (profile) {
+        (profile as any).id = profile._id.toString();
     }
 
     const accessToken = jwt.sign(
@@ -157,7 +157,7 @@ router.post('/login', async (req, res, next) => {
           firstName: user.firstName,
           lastName: user.lastName,
           role: user.role,
-          profile: user.patientProfile || user.therapistProfile,
+          profile,
         },
         accessToken,
         refreshToken,
@@ -180,9 +180,7 @@ router.post('/refresh', async (req, res, next) => {
       id: string;
     };
 
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
-    });
+    const user = await User.findById(decoded.id);
 
     if (!user) {
       throw createError('User not found', 401);
@@ -205,16 +203,21 @@ router.post('/refresh', async (req, res, next) => {
 
 router.get('/me', authenticate, async (req: AuthRequest, res: Response, next) => {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user!.id },
-      include: {
-        patientProfile: true,
-        therapistProfile: true,
-      },
-    });
+    const user = await User.findById(req.user!.id);
 
     if (!user) {
       throw createError('User not found', 404);
+    }
+
+    let profile = null;
+    if (user.role === 'PATIENT') {
+        profile = await PatientProfile.findOne({ user: user._id }).lean();
+    } else {
+        profile = await TherapistProfile.findOne({ user: user._id }).lean();
+    }
+
+    if(profile) {
+        (profile as any).id = profile._id.toString();
     }
 
     res.json({
@@ -227,7 +230,7 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response, next) =>
           lastName: user.lastName,
           phone: user.phone,
           role: user.role,
-          profile: user.patientProfile || user.therapistProfile,
+          profile,
         },
       },
     });

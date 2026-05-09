@@ -9,6 +9,7 @@ import { LoginPage } from "./pages/login-page";
 import { RegisterPage } from "./pages/register-page";
 import { SymptomScreening } from "./pages/symptom-screening";
 import { ScreeningResults } from "./pages/screening-results";
+import { TherapistAvailability } from "./pages/therapist-availability";
 import { NotFound } from "./pages/not-found";
 
 import { AboutPage } from "./pages/about-page";
@@ -58,6 +59,10 @@ export const router = createBrowserRouter([
   {
     path: "/dashboard/therapist",
     Component: TherapistDashboard,
+  },
+  {
+    path: "/dashboard/therapist/availability",
+    Component: TherapistAvailability,
   },
   {
     path: "/dashboard/admin",

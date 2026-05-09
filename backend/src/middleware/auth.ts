@@ -1,9 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { createError } from './errorHandler.js';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import User from '../models/User.js';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -33,9 +31,7 @@ export const authenticate = async (
       role: string;
     };
 
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
-    });
+    const user = await User.findById(decoded.id);
 
     if (!user) {
       throw createError('User not found', 401);
@@ -82,9 +78,7 @@ export const optionalAuth = async (
         role: string;
       };
 
-      const user = await prisma.user.findUnique({
-        where: { id: decoded.id },
-      });
+      const user = await User.findById(decoded.id);
 
       if (user) {
         req.user = {

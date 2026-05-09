@@ -26,6 +26,7 @@ Before starting, ensure you have:
 - Internet connection
 - Basic familiarity with command line/terminal
 - 10GB+ free disk space
+- MongoDB Community Server installed locally
 
 ---
 
@@ -137,79 +138,46 @@ While not required, VS Code makes development much easier.
 
 ---
 
-## Step 2: Set Up PostgreSQL Database
+## Step 2: Set Up MongoDB Database
 
-PostgreSQL is a powerful, open-source database system where all application data will be stored.
+MongoDB is a powerful, open-source NoSQL database system where all application data will be stored.
 
-### 2.1 Download and Install PostgreSQL
+### 2.1 Download and Install MongoDB
 
 **For Windows:**
 
-1. Visit https://www.postgresql.org/download/windows/
-2. Download the latest PostgreSQL installer
+1. Visit https://www.mongodb.com/try/download/community
+2. Download the latest MongoDB Community Server installer (MSI)
 3. Run the installer
-4. On the "Select Components" screen, ensure these are checked:
-   - [x] PostgreSQL Server
-   - [x] pgAdmin 4 (Database management tool)
-   - [x] Command Line Tools
-5. Set a password for the postgres user (remember this!)
-6. Keep the default port: **5432**
+4. Choose "Complete" setup type
+5. Ensure "Install MongoDB as a Service" is checked
+6. Optionally install MongoDB Compass (GUI) to view your data
 7. Complete the installation
 
 **For macOS:**
 ```bash
 # Using Homebrew
-brew install postgresql@15
-brew services start postgresql@15
+brew tap mongodb/brew
+brew install mongodb-community@7.0
+brew services start mongodb-community@7.0
 ```
 
 **For Linux (Ubuntu/Debian):**
-```bash
-sudo apt update
-sudo apt install postgresql postgresql-contrib
-sudo systemctl start postgresql
-sudo systemctl enable postgresql
-```
+Follow the official MongoDB documentation for your specific distribution.
 
-### 2.2 Create the Database
+### 2.2 Verify Database Connection
 
-**Using pgAdmin (GUI - Recommended for Beginners):**
-
-1. Open pgAdmin (found in Start Menu on Windows)
-2. Click on "Servers" → "PostgreSQL" in the left sidebar
-3. Enter the password you set during installation
-4. Right-click on "Databases" → "Create" → "Database..."
-5. Enter these details:
-   - Database: `mental_health_db`
-   - Owner: `postgres`
-6. Click Save
-
-**Using Command Line:**
-
-```bash
-# Connect to PostgreSQL
-psql -U postgres
-
-# Create the database (run this command)
-CREATE DATABASE mental_health_db;
-
-# Exit psql
-\q
-```
-
-### 2.3 Verify Database Connection
-
-You can verify PostgreSQL is running by:
+You can verify MongoDB is running by:
 
 **Windows:**
 1. Open Services app
-2. Find "postgresql-x64-..." service
+2. Find "MongoDB Server" service
 3. Ensure Status is "Running"
 
 **macOS/Linux:**
 ```bash
 brew services list  # macOS
-sudo systemctl status postgresql  # Linux
+sudo systemctl status mongod  # Linux
 ```
 
 ---
@@ -242,7 +210,7 @@ npm install
 
 This will install:
 - Express (web framework)
-- Prisma (database ORM)
+- Mongoose (database ODM)
 - JSON Web Token (authentication)
 - Bcrypt (password hashing)
 - Socket.io (real-time chat)
@@ -263,45 +231,16 @@ Environment variables store configuration settings like database passwords.
 3. Update these values:
    ```env
    PORT=3001
-   DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@localhost:5432/mental_health_db"
+   DATABASE_URL="mongodb://localhost:27017/mhp_db"
    JWT_SECRET="any-secure-random-string-at-least-32-characters"
    JWT_REFRESH_SECRET="another-secure-random-string"
    AI_SERVICE_URL="http://localhost:5001"
    FRONTEND_URL="http://localhost:5173"
    ```
 
-   **Important:** Replace `YOUR_PASSWORD` with the password you set for PostgreSQL during installation.
+   **Important:** Mongoose will automatically create the `mhp_db` database for you when the backend starts.
 
-### 3.4 Generate Prisma Client
 
-Prisma Client is an auto-generated database client that makes it easy to query your database.
-
-```bash
-npx prisma generate
-```
-
-You should see output like:
-```
-✔ Generated Prisma Client for .../schema.prisma
-```
-
-### 3.5 Run Database Migrations
-
-Migrations create the database tables based on the schema.
-
-```bash
-npx prisma migrate dev --name init
-```
-
-When prompted:
-- Enter a name for the migration: `init`
-- This will create all necessary tables in your database
-
-You should see:
-```
-Your database is now in sync with your schema.
-✔ Created migration 20240101000000_init
-```
 
 ### 3.6 Verify Backend Setup
 
@@ -528,68 +467,7 @@ Since the database starts empty, you need to create test users.
 
 ### Option 2: Create Admin User via Database
 
-Connect to your database and run:
-
-```sql
--- Connect to database
-\c mental_health_db
-
--- Insert admin user (password: admin123)
-INSERT INTO users (
-  id, email, password, "firstName", "lastName", role, "createdAt", "updatedAt"
-) VALUES (
-  gen_random_uuid(),
-  'admin@example.com',
-  '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewKyNiAYvxqFKF3.',
-  'Admin',
-  'User',
-  'ADMIN',
-  NOW(),
-  NOW()
-);
-```
-
-Login credentials:
-- Email: `admin@example.com`
-- Password: `admin123`
-
-### Option 3: Seed Database (Advanced)
-
-Create a seed script at `backend/src/prisma/seed.ts`:
-
-```typescript
-import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
-
-const prisma = new PrismaClient();
-
-async function main() {
-  const adminPassword = await bcrypt.hash('admin123', 12);
-  
-  const admin = await prisma.user.upsert({
-    where: { email: 'admin@example.com' },
-    update: {},
-    create: {
-      email: 'admin@example.com',
-      password: adminPassword,
-      firstName: 'Admin',
-      lastName: 'User',
-      role: 'ADMIN',
-    },
-  });
-
-  console.log({ admin });
-}
-
-main()
-  .catch((e) => console.error(e))
-  .finally(async () => await prisma.$disconnect());
-```
-
-Run the seed:
-```bash
-npx tsx src/prisma/seed.ts
-```
+You can create a seed script or use MongoDB Compass to insert an admin user.
 
 ---
 
@@ -629,15 +507,6 @@ taskkill /PID <process_id> /F
 # macOS/Linux
 lsof -i :3001
 kill -9 <process_id>
-```
-
-#### 4. Prisma Client Not Found
-
-**Problem:** `Cannot find module '@prisma/client'`
-
-**Solution:**
-```bash
-npx prisma generate
 ```
 
 #### 5. Python Virtual Environment Issues
@@ -727,11 +596,11 @@ Understanding how the pieces fit together:
           │ SQL Queries
           ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                     POSTGRESQL DATABASE                          │
-│                  localhost:5432                                   │
-│                  mental_health_db                                │
+│                     MONGODB DATABASE                          │
+│                  localhost:27017                                  │
+│                  mhp_db                                │
 │                                                                 │
-│   Tables: users, patient_profiles, therapist_profiles,           │
+│   Collections: users, patient_profiles, therapist_profiles,           │
 │           appointments, payments, chat_messages, reviews,         │
 │           screening_results, availability                        │
 └─────────────────────────────────────────────────────────────────┘
@@ -783,9 +652,6 @@ Understanding how the pieces fit together:
 cd backend
 npm install              # Install dependencies
 npm run dev             # Start development server
-npx prisma generate     # Generate Prisma client
-npx prisma migrate dev  # Run migrations
-npx prisma studio       # Open database GUI
 ```
 
 ### Frontend Commands

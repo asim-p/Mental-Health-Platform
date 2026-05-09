@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Navbar } from "../components/navbar";
 import { TherapistCard } from "../components/therapist-card";
 import { Card, CardContent } from "../components/ui/card";
@@ -7,8 +7,9 @@ import { Checkbox } from "../components/ui/checkbox";
 import { Slider } from "../components/ui/slider";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
-import { mockTherapists, Specialty, Language } from "../data/therapists";
-import { Search, Filter } from "lucide-react";
+import { Specialty, Language, Therapist } from "../data/therapists";
+import { Search, Filter, Loader2 } from "lucide-react";
+import { api } from "../services/api";
 
 const specialties: Specialty[] = [
   "Depression",
@@ -28,14 +29,67 @@ export function TherapistDirectory() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSpecialties, setSelectedSpecialties] = useState<Specialty[]>([]);
   const [selectedLanguages, setSelectedLanguages] = useState<Language[]>([]);
-  const [priceRange, setPriceRange] = useState([0, 3000]);
+  const [priceRange, setPriceRange] = useState([0, 5000]);
   const [showFilters, setShowFilters] = useState(false);
+  const [therapists, setTherapists] = useState<Therapist[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchTherapists = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const params: Record<string, string> = {
+        verified: "true",
+      };
+
+      if (searchQuery) params.search = searchQuery;
+      if (selectedSpecialties.length > 0) params.specialty = selectedSpecialties[0]; // Backend currently supports one specialty filter or I'll need to update backend
+      if (selectedLanguages.length > 0) params.language = selectedLanguages[0];
+      if (priceRange[0] > 0) params.minPrice = priceRange[0].toString();
+      if (priceRange[1] < 5000) params.maxPrice = priceRange[1].toString();
+
+      const response = await api.therapists.getAll(params);
+
+      if (response.success && response.data) {
+        const mapped: Therapist[] = response.data.therapists.map((t: any) => ({
+          id: t.user.id || t.id,
+          name: `${t.user.firstName} ${t.user.lastName}`,
+          title: t.qualifications?.[0] || "Therapist",
+          specialties: t.specialization as Specialty[],
+          languages: t.languages as Language[],
+          pricePerSession: t.hourlyRate,
+          verified: t.isVerified,
+          rating: t.rating,
+          totalSessions: t.reviewCount,
+          bio: t.bio || "",
+          education: t.qualifications?.join(", ") || "",
+          experience: t.yearsOfExperience || 0,
+        }));
+        setTherapists(mapped);
+      }
+    } catch (err: any) {
+      console.error("Failed to fetch therapists:", err);
+      setError("Failed to load therapists. Please try again later.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [searchQuery, selectedSpecialties, selectedLanguages, priceRange]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchTherapists();
+    }, 500); // Debounce search
+
+    return () => clearTimeout(timer);
+  }, [fetchTherapists]);
 
   const toggleSpecialty = (specialty: Specialty) => {
     setSelectedSpecialties((prev) =>
       prev.includes(specialty)
         ? prev.filter((s) => s !== specialty)
-        : [...prev, specialty]
+        : [specialty] // Simplified to one for backend compatibility for now
     );
   };
 
@@ -43,47 +97,9 @@ export function TherapistDirectory() {
     setSelectedLanguages((prev) =>
       prev.includes(language)
         ? prev.filter((l) => l !== language)
-        : [...prev, language]
+        : [language]
     );
   };
-
-  const filteredTherapists = mockTherapists.filter((therapist) => {
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      if (
-        !therapist.name.toLowerCase().includes(query) &&
-        !therapist.title.toLowerCase().includes(query) &&
-        !therapist.bio.toLowerCase().includes(query)
-      ) {
-        return false;
-      }
-    }
-
-    // Specialty filter
-    if (selectedSpecialties.length > 0) {
-      if (!selectedSpecialties.some((s) => therapist.specialties.includes(s))) {
-        return false;
-      }
-    }
-
-    // Language filter
-    if (selectedLanguages.length > 0) {
-      if (!selectedLanguages.some((l) => therapist.languages.includes(l))) {
-        return false;
-      }
-    }
-
-    // Price filter
-    if (
-      therapist.pricePerSession < priceRange[0] ||
-      therapist.pricePerSession > priceRange[1]
-    ) {
-      return false;
-    }
-
-    return true;
-  });
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -96,7 +112,7 @@ export function TherapistDirectory() {
             Find Your Therapist
           </h1>
           <p className="text-lg text-gray-600">
-            Browse {mockTherapists.length} verified mental health professionals
+            Browse {therapists.length} verified mental health professionals
           </p>
         </div>
 
@@ -225,13 +241,25 @@ export function TherapistDirectory() {
           {/* Therapist Grid */}
           <div className="lg:col-span-3">
             <div className="mb-4 text-sm text-gray-600">
-              Showing {filteredTherapists.length} therapist
-              {filteredTherapists.length !== 1 ? "s" : ""}
+              Showing {therapists.length} therapist
+              {therapists.length !== 1 ? "s" : ""}
             </div>
 
-            {filteredTherapists.length > 0 ? (
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
+                <p className="text-muted-foreground font-medium">Finding the best therapists for you...</p>
+              </div>
+            ) : error ? (
+              <Card className="border-destructive/20 bg-destructive/5">
+                <CardContent className="py-12 text-center">
+                  <p className="text-destructive font-semibold mb-4">{error}</p>
+                  <Button onClick={fetchTherapists}>Try Again</Button>
+                </CardContent>
+              </Card>
+            ) : therapists.length > 0 ? (
               <div className="grid md:grid-cols-2 gap-6">
-                {filteredTherapists.map((therapist) => (
+                {therapists.map((therapist) => (
                   <TherapistCard key={therapist.id} therapist={therapist} />
                 ))}
               </div>
@@ -246,7 +274,7 @@ export function TherapistDirectory() {
                     onClick={() => {
                       setSelectedSpecialties([]);
                       setSelectedLanguages([]);
-                      setPriceRange([0, 3000]);
+                      setPriceRange([0, 5000]);
                       setSearchQuery("");
                     }}
                   >

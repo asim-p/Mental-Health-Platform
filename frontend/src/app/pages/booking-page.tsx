@@ -8,8 +8,9 @@ import { Label } from "../components/ui/label";
 import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 import { Calendar } from "../components/ui/calendar";
 import { mockTherapists } from "../data/therapists";
-import { Star, CheckCircle, Calendar as CalendarIcon, Clock, DollarSign, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "../context/AuthContext";
+import { useEffect } from "react";
 
 const availableTimeSlots = [
   "09:00 AM",
@@ -24,6 +25,15 @@ const availableTimeSlots = [
 export function BookingPage() {
   const { therapistId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  
+  useEffect(() => {
+    if (user?.role === 'THERAPIST') {
+      toast.error("Therapists cannot book other therapists.");
+      navigate("/therapists");
+    }
+  }, [user, navigate]);
+
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedTime, setSelectedTime] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("esewa");
@@ -90,10 +100,8 @@ export function BookingPage() {
                   </div>
                   <p className="text-gray-600">{therapist.title}</p>
                   <div className="flex items-center justify-center gap-2 mt-2">
-                    <Star className="text-yellow-500 fill-yellow-500" size={16} />
-                    <span className="font-medium">{therapist.rating}</span>
                     <span className="text-gray-500 text-sm">
-                      ({therapist.totalSessions} sessions)
+                      {therapist.totalSessions || 0} sessions completed
                     </span>
                   </div>
                 </div>

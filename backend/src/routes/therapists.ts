@@ -1,10 +1,13 @@
 import { Router, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import User from '../models/User.js';
+import TherapistProfile from '../models/TherapistProfile.js';
+import Availability from '../models/Availability.js';
+import Appointment, { AppointmentStatus } from '../models/Appointment.js';
+import Review from '../models/Review.js';
 import { authenticate, authorize, optionalAuth, AuthRequest } from '../middleware/auth.js';
 import { createError } from '../middleware/errorHandler.js';
 import { z } from 'zod';
 
-const prisma = new PrismaClient();
 const router = Router();
 
 router.get('/', optionalAuth, async (req: AuthRequest, res: Response, next) => {
@@ -22,37 +25,33 @@ router.get('/', optionalAuth, async (req: AuthRequest, res: Response, next) => {
       limit = '10',
     } = req.query;
 
-    const where: any = {
-      isVerified: verified === 'true' ? true : undefined,
-    };
+    const where: any = {};
+    if (verified === 'true') where.isVerified = true;
 
-    if (specialty) {
-      where.specialization = { hasSome: [specialty as string] };
-    }
-
-    if (language) {
-      where.languages = { hasSome: [language as string] };
-    }
-
-    if (gender) {
-      where.gender = gender;
-    }
-
-    if (minRating) {
-      where.rating = { gte: parseFloat(minRating as string) };
-    }
+    if (specialty) where.specialization = { $in: [specialty as string] };
+    if (language) where.languages = { $in: [language as string] };
+    if (gender) where.gender = gender;
+    if (minRating) where.rating = { $gte: parseFloat(minRating as string) };
 
     if (minPrice || maxPrice) {
       where.hourlyRate = {};
-      if (minPrice) where.hourlyRate.gte = parseFloat(minPrice as string);
-      if (maxPrice) where.hourlyRate.lte = parseFloat(maxPrice as string);
+      if (minPrice) where.hourlyRate.$gte = parseFloat(minPrice as string);
+      if (maxPrice) where.hourlyRate.$lte = parseFloat(maxPrice as string);
     }
 
     if (search) {
-      where.OR = [
-        { bio: { contains: search as string, mode: 'insensitive' } },
-        { user: { firstName: { contains: search as string, mode: 'insensitive' } } },
-        { user: { lastName: { contains: search as string, mode: 'insensitive' } } },
+      const searchRegex = new RegExp(search as string, 'i');
+      const matchingUsers = await User.find({
+        $or: [
+          { firstName: searchRegex },
+          { lastName: searchRegex }
+        ]
+      }).select('_id');
+      const userIds = matchingUsers.map(u => u._id);
+
+      where.$or = [
+        { bio: searchRegex },
+        { user: { $in: userIds } }
       ];
     }
 
@@ -60,31 +59,25 @@ router.get('/', optionalAuth, async (req: AuthRequest, res: Response, next) => {
     const limitNum = parseInt(limit as string);
     const skip = (pageNum - 1) * limitNum;
 
-    const [therapists, total] = await Promise.all([
-      prisma.therapistProfile.findMany({
-        where,
-        include: {
-          user: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-            },
-          },
-          availability: true,
-        },
-        skip,
-        take: limitNum,
-        orderBy: { rating: 'desc' },
-      }),
-      prisma.therapistProfile.count({ where }),
-    ]);
+    const total = await TherapistProfile.countDocuments(where);
+    const therapists = await TherapistProfile.find(where)
+      .sort({ rating: -1 })
+      .skip(skip)
+      .limit(limitNum)
+      .populate('user', 'firstName lastName email')
+      .lean();
+
+    const populatedTherapists = await Promise.all(therapists.map(async (t: any) => {
+      t.id = t._id.toString();
+      t.user.id = t.user._id.toString();
+      t.availability = await Availability.find({ therapistId: t._id }).lean();
+      return t;
+    }));
 
     res.json({
       success: true,
       data: {
-        therapists,
+        therapists: populatedTherapists,
         pagination: {
           page: pageNum,
           limit: limitNum,
@@ -98,33 +91,23 @@ router.get('/', optionalAuth, async (req: AuthRequest, res: Response, next) => {
   }
 });
 
-router.get('/:id', async (req, res, Response, next) => {
+router.get('/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const profile = await prisma.therapistProfile.findFirst({
-      where: { userId: id },
-      include: {
-        user: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            phone: true,
-          },
-        },
-        availability: true,
-        reviews: {
-          orderBy: { createdAt: 'desc' },
-          take: 10,
-        },
-      },
-    });
+    const profile: any = await TherapistProfile.findOne({ user: id })
+      .populate('user', 'firstName lastName email phone')
+      .lean();
 
     if (!profile) {
       throw createError('Therapist not found', 404);
     }
+
+    profile.id = profile._id.toString();
+    if(profile.user) profile.user.id = profile.user._id.toString();
+
+    profile.availability = await Availability.find({ therapistId: profile._id }).lean();
+    profile.reviews = await Review.find({ therapistId: profile._id }).sort({ createdAt: -1 }).limit(10).lean();
 
     res.json({
       success: true,
@@ -135,34 +118,28 @@ router.get('/:id', async (req, res, Response, next) => {
   }
 });
 
-router.get('/:id/availability', async (req, res, Response, next) => {
+router.get('/:id/availability', async (req, res, next) => {
   try {
     const { id } = req.params;
     const { date } = req.query;
 
-    const profile = await prisma.therapistProfile.findFirst({
-      where: { userId: id },
-      include: { availability: true },
-    });
+    const profile: any = await TherapistProfile.findOne({ user: id }).lean();
 
     if (!profile) {
       throw createError('Therapist not found', 404);
     }
+    
+    profile.availability = await Availability.find({ therapistId: profile._id }).lean();
 
-    const appointments = await prisma.appointment.findMany({
-      where: {
-        therapistId: profile.id,
-        scheduledAt: {
-          gte: new Date(date as string || new Date()),
-        },
-        status: { not: 'CANCELLED' },
+    const appointments = await Appointment.find({
+      therapistId: profile._id,
+      scheduledAt: {
+        $gte: new Date(date as string || new Date()),
       },
-      select: {
-        scheduledAt: true,
-      },
-    });
+      status: { $ne: AppointmentStatus.CANCELLED },
+    }).select('scheduledAt').lean();
 
-    const bookedSlots = appointments.map((a) => a.scheduledAt.toISOString());
+    const bookedSlots = appointments.map((a: any) => a.scheduledAt.toISOString());
 
     res.json({
       success: true,
@@ -192,28 +169,25 @@ router.patch('/availability', authenticate, authorize('THERAPIST'), async (req: 
   try {
     const data = updateAvailabilitySchema.parse(req.body);
 
-    const profile = await prisma.therapistProfile.findFirst({
-      where: { userId: req.user!.id },
-    });
+    const profile = await TherapistProfile.findOne({ user: req.user!.id });
 
     if (!profile) {
       throw createError('Therapist profile not found', 404);
     }
 
-    await prisma.availability.deleteMany({
-      where: { therapistId: profile.id },
-    });
+    await Availability.deleteMany({ therapistId: profile._id });
 
-    await prisma.availability.createMany({
-      data: data.availability.map((slot) => ({
-        therapistId: profile.id,
-        ...slot,
-      })),
-    });
+    const newAvailability = data.availability.map((slot) => ({
+      therapistId: profile._id,
+      dayOfWeek: slot.dayOfWeek,
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      isAvailable: slot.isAvailable
+    }));
 
-    const updated = await prisma.availability.findMany({
-      where: { therapistId: profile.id },
-    });
+    await Availability.insertMany(newAvailability);
+
+    const updated = await Availability.find({ therapistId: profile._id }).lean();
 
     res.json({
       success: true,
@@ -239,22 +213,19 @@ router.patch('/profile', authenticate, authorize('THERAPIST'), async (req: AuthR
   try {
     const data = updateProfileSchema.parse(req.body);
 
-    const profile = await prisma.therapistProfile.findFirst({
-      where: { userId: req.user!.id },
-    });
+    const profile = await TherapistProfile.findOneAndUpdate(
+      { user: req.user!.id },
+      data,
+      { new: true }
+    ).lean();
 
     if (!profile) {
       throw createError('Therapist profile not found', 404);
     }
 
-    const updated = await prisma.therapistProfile.update({
-      where: { id: profile.id },
-      data,
-    });
-
     res.json({
       success: true,
-      data: updated,
+      data: profile,
     });
   } catch (error) {
     next(error);
