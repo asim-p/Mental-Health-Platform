@@ -1,4 +1,4 @@
-# AI-Assisted Mental Health Screening and Consultation System
+# AI-Assisted Mental Health Platform
 
 A comprehensive mental health platform for Nepal, featuring AI-powered symptom screening, therapist matching, appointment booking, and secure telehealth consultations.
 
