@@ -1,0 +1,200 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  PATIENT
+  THERAPIST
+  ADMIN
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+model User {
+  id              String    @id @default(uuid())
+  email           String    @unique
+  password        String
+  firstName       String
+  lastName        String
+  phone           String?
+  role            UserRole  @default(PATIENT)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  patientProfile  PatientProfile?
+  therapistProfile TherapistProfile?
+
+  @@map("users")
+}
+
+model PatientProfile {
+  id              String    @id @default(uuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dateOfBirth     DateTime?
+  gender          String?
+  address         String?
+  emergencyContact String?
+  preferredLanguage String  @default("Nepali")
+  lastScreeningAt DateTime?
+
+  appointments   Appointment[]
+  messagesSent   ChatMessage[] @relation("PatientMessages")
+  screeningResults ScreeningResult[]
+
+  @@map("patient_profiles")
+}
+
+model TherapistProfile {
+  id              String    @id @default(uuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  specialization   String[]
+  qualifications  String[]
+  yearsOfExperience Int      @default(0)
+  bio             String?
+  hourlyRate      Decimal   @default(1500)
+  gender          String?
+  languages       String[]  @default(["Nepali"])
+  rating          Decimal   @default(0)
+  reviewCount     Int       @default(0)
+  isVerified      Boolean   @default(false)
+  verificationStatus String @default("PENDING")
+  credentials     String?
+  licenseNumber   String?
+  zoomUserId      String?
+  
+  appointments   Appointment[]
+  availability   Availability[]
+  messagesReceived ChatMessage[] @relation("TherapistMessages")
+  reviews        Review[]
+
+  @@map("therapist_profiles")
+}
+
+model Availability {
+  id          String    @id @default(uuid())
+  therapistId String
+  therapist   TherapistProfile @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  dayOfWeek   Int
+  startTime   String
+  endTime     String
+  isAvailable Boolean   @default(true)
+
+  @@map("availability")
+}
+
+model Appointment {
+  id              String    @id @default(uuid())
+  patientId       String
+  patient         PatientProfile @relation(fields: [patientId], references: [id])
+  therapistId     String
+  therapist       TherapistProfile @relation(fields: [therapistId], references: [id])
+  
+  scheduledAt     DateTime
+  duration        Int       @default(60)
+  status          AppointmentStatus @default(PENDING)
+  
+  paymentId       String?
+  payment         Payment?
+  zoomMeetingUrl  String?
+  zoomJoinUrl     String?
+  
+  notes           String?
+  aiPrediction    String?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  chatMessages    ChatMessage[]
+
+  @@map("appointments")
+}
+
+model Payment {
+  id              String    @id @default(uuid())
+  appointmentId   String    @unique
+  appointment     Appointment @relation(fields: [appointmentId], references: [id])
+  
+  amount          Decimal
+  currency        String    @default("NPR")
+  paymentMethod   String?
+  transactionId   String?
+  status          PaymentStatus @default(PENDING)
+  
+  esewaRefId      String?
+  esewaAmount     String?
+  esewaTimestamp  DateTime?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("payments")
+}
+
+model ChatMessage {
+  id              String    @id @default(uuid())
+  appointmentId   String
+  appointment     Appointment @relation(fields: [appointmentId], references: [id])
+  
+  senderType      String
+  patientId       String
+  patient         PatientProfile @relation("PatientMessages", fields: [patientId], references: [id])
+  therapistId     String
+  therapist       TherapistProfile @relation("TherapistMessages", fields: [therapistId], references: [id])
+  
+  content         String
+  isRead          Boolean   @default(false)
+  
+  createdAt       DateTime  @default(now())
+
+  @@map("chat_messages")
+}
+
+model Review {
+  id              String    @id @default(uuid())
+  appointmentId   String    @unique
+  therapistId     String
+  therapist       TherapistProfile @relation(fields: [therapistId], references: [id])
+  patientId       String
+  
+  rating          Int
+  comment         String?
+  
+  createdAt       DateTime  @default(now())
+
+  @@map("reviews")
+}
+
+model ScreeningResult {
+  id              String    @id @default(uuid())
+  patientId       String
+  patient         PatientProfile @relation(fields: [patientId], references: [id])
+  
+  inputText       String
+  predictedCategory String
+  confidence      Decimal
+  recommendedSpecializations String[]
+  
+  createdAt       DateTime  @default(now())
+
+  @@map("screening_results")
+}
