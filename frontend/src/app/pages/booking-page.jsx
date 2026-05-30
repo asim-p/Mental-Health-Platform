@@ -125,10 +125,28 @@ export function BookingPage() {
       });
 
       if (response.success) {
-        toast.success("Appointment booked successfully!");
-        setTimeout(() => {
-          navigate("/dashboard/patient");
-        }, 2000);
+        toast.success("Appointment booked! Redirecting to payment...");
+        
+        const paymentRes = await api.payments.initiate(response.data.id);
+        
+        if (paymentRes.success && paymentRes.data) {
+          const { paymentUrl, params } = paymentRes.data;
+          
+          const form = document.createElement("form");
+          form.setAttribute("method", "POST");
+          form.setAttribute("action", paymentUrl);
+          
+          for (const key in params) {
+            const hiddenField = document.createElement("input");
+            hiddenField.setAttribute("type", "hidden");
+            hiddenField.setAttribute("name", key);
+            hiddenField.setAttribute("value", params[key]);
+            form.appendChild(hiddenField);
+          }
+          
+          document.body.appendChild(form);
+          form.submit();
+        }
       }
     } catch (error) {
       toast.error(error.message || "Failed to book appointment");

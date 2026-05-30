@@ -6,6 +6,7 @@ import TherapistProfile from '../models/TherapistProfile.js';
 import { authenticate } from '../middleware/auth.js';
 import { createError } from '../middleware/errorHandler.js';
 import { createHmac } from 'crypto';
+import { createZoomMeeting } from '../services/zoom.js';
 
 const router = Router();
 
@@ -31,24 +32,39 @@ router.post('/initiate', authenticate, async (req, res, next) => {
     const amount = Number(therapistProfile?.hourlyRate || 0);
     const uuid = `MHP${Date.now()}`;
 
-    const signaturePayload = `merchant_id=MHP001|merchant_key=MHP001_KEY|total_amount=${amount}|transaction_uuid=${uuid}`;
-    const signature = createHmac('sha256', 'MHP001_SECRET')
+    const payment = await Payment.findOneAndUpdate(
+      { appointmentId },
+      {
+        amount,
+        paymentMethod: 'esewa',
+        transactionId: uuid,
+        status: 'PENDING'
+      },
+      { upsert: true, new: true }
+    );
+
+    await Appointment.findByIdAndUpdate(appointmentId, { paymentId: payment._id });
+
+    const signaturePayload = `total_amount=${amount},transaction_uuid=${uuid},product_code=EPAYTEST`;
+    const signature = createHmac('sha256', '8gBm/:&EnhH.1/q')
       .update(signaturePayload)
       .digest('base64');
 
     res.json({
       success: true,
       data: {
-        paymentUrl: 'https://uat.esewa.com.np/epay/main',
+        paymentUrl: 'https://rc-epay.esewa.com.np/api/epay/main/v2/form',
         params: {
-          amt: amount,
-          txAmt: 0,
-          psc: 0,
-          pdc: 0,
-          scd: 'MHP001',
-          pid: uuid,
-          su: `${process.env.FRONTEND_URL}/payment/success`,
-          fu: `${process.env.FRONTEND_URL}/payment/failure`,
+          amount: amount,
+          tax_amount: 0,
+          total_amount: amount,
+          transaction_uuid: uuid,
+          product_code: 'EPAYTEST',
+          product_delivery_charge: 0,
+          product_service_charge: 0,
+          success_url: `${process.env.FRONTEND_URL}/payment/success`,
+          failure_url: `${process.env.FRONTEND_URL}/payment/failure`,
+          signed_field_names: 'total_amount,transaction_uuid,product_code',
           signature,
         },
       },
@@ -60,33 +76,55 @@ router.post('/initiate', authenticate, async (req, res, next) => {
 
 router.post('/verify', async (req, res, next) => {
   try {
+    const { data } = req.body;
+
+    if (!data) {
+      throw createError('Missing payload data', 400);
+    }
+
+    // Decode base64 string
+    const decodedData = Buffer.from(data, 'base64').toString('utf-8');
+    const parsedData = JSON.parse(decodedData);
+
     const {
-      amt,
-      refId,
-      pid,
       status,
       transaction_uuid,
-    } = req.body;
+      total_amount,
+      transaction_code
+    } = parsedData;
 
-    if (status !== 'success') {
-      throw createError('Payment failed', 400);
+    if (status !== 'COMPLETE') {
+      throw createError('Payment failed or cancelled', 400);
     }
 
     const payment = await Payment.findOne({ transactionId: transaction_uuid });
 
     if (!payment) throw createError('Payment not found', 404);
 
-    if (Number(amt) !== Number(payment.amount)) {
+    if (Number(total_amount.replace(/,/g, '')) !== Number(payment.amount)) {
       throw createError('Amount mismatch', 400);
     }
 
     payment.status = 'COMPLETED';
-    payment.esewaRefId = refId;
+    payment.esewaRefId = transaction_code;
     payment.esewaTimestamp = new Date();
-    payment.transactionId = transaction_uuid;
     await payment.save();
 
-    await Appointment.findByIdAndUpdate(payment.appointmentId, { status: 'CONFIRMED' });
+    const appointment = await Appointment.findById(payment.appointmentId).populate({
+      path: 'patientId',
+      populate: { path: 'user', select: 'firstName lastName' }
+    });
+
+    if (!appointment) {
+      throw createError('Appointment not found', 404);
+    }
+
+    const patientName = appointment.patientId?.user
+      ? `${appointment.patientId.user.firstName} ${appointment.patientId.user.lastName}`
+      : 'Patient';
+
+    appointment.status = 'PAID';
+    await appointment.save();
 
     res.json({
       success: true,

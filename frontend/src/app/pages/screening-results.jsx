@@ -12,8 +12,7 @@ import {
   CheckCircle2,
   Phone,
   DollarSign,
-  User,
-  Star
+  User
 } from 'lucide-react';
 import { api } from '../services/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -162,10 +161,6 @@ export function ScreeningResults() {
                                 <h3 className="font-bold text-lg leading-none mb-1">
                                   Dr. {therapist.user?.firstName} {therapist.user?.lastName}
                                 </h3>
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  <Star size={12} className="text-yellow-500 fill-yellow-500" />
-                                  <span>{therapist.rating || '4.8'} (20+ reviews)</span>
-                                </div>
                               </div>
                             </div>
                             <div className="flex flex-wrap gap-2 mb-4">
@@ -273,18 +268,7 @@ export function ScreeningResults() {
                     </Badge>
                   </div>
                 </div>
-                <div>
-                  <p className="text-[10px] uppercase text-muted-foreground font-bold mb-1">Analysis Confidence</p>
-                  <div className="w-full bg-gray-100 rounded-full h-1.5 mb-1">
-                    <div 
-                      className="bg-primary h-1.5 rounded-full" 
-                      style={{ width: `${(result.confidence || 0.85) * 100}%` }}
-                    />
-                  </div>
-                  <p className="text-[10px] text-right text-muted-foreground">
-                    {( (result.confidence || 0.85) * 100).toFixed(0)}% Match accuracy
-                  </p>
-                </div>
+
               </CardContent>
             </Card>
           </div>

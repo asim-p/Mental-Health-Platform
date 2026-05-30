@@ -65,6 +65,11 @@ class ApiService {
     getPatients: () => this.request('/users/patients'),
     getTherapists: () => this.request('/users/therapists'),
     verifyTherapist: (id, action) => this.request(`/users/therapists/${id}/verify`, { method: 'PATCH', body: { action } }),
+    deleteUser: (id) => this.request(`/users/${id}`, { method: 'DELETE' }),
+  };
+
+  admin = {
+    getStats: () => this.request('/admin/stats'),
   };
 
   therapists = {

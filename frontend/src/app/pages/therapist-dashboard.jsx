@@ -27,6 +27,8 @@ export function TherapistDashboard() {
   const [appointments, setAppointments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [profile, setProfile] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [viewMode, setViewMode] = useState('day'); // 'day' or 'all'
 
   useEffect(() => {
     if (!user) {
@@ -62,10 +64,9 @@ export function TherapistDashboard() {
     navigate('/');
   };
 
-  const todayAppointments = appointments.filter((a) => {
-    const appointmentDate = new Date(a.scheduledAt).toDateString();
-    const today = new Date().toDateString();
-    return appointmentDate === today && a.status !== 'CANCELLED';
+  const selectedDateAppointments = appointments.filter((a) => {
+    const appointmentDate = new Date(a.scheduledAt).toISOString().split('T')[0];
+    return appointmentDate === selectedDate && a.status !== 'CANCELLED';
   });
 
   const upcomingAppointments = appointments.filter((a) => {
@@ -100,16 +101,33 @@ export function TherapistDashboard() {
     switch (status) {
       case 'CONFIRMED':
         return 'bg-green-100 text-green-700';
+      case 'PAID':
+        return 'bg-blue-100 text-blue-700';
       case 'PENDING':
         return 'bg-yellow-100 text-yellow-700';
       case 'COMPLETED':
-        return 'bg-blue-100 text-blue-700';
+        return 'bg-purple-100 text-purple-700';
       case 'CANCELLED':
         return 'bg-red-100 text-red-700';
       default:
         return 'bg-gray-100 text-gray-700';
     }
   };
+
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'PENDING': return 'Unpaid';
+      case 'PAID': return 'Paid';
+      case 'CONFIRMED': return 'Confirmed';
+      case 'COMPLETED': return 'Completed';
+      case 'CANCELLED': return 'Cancelled';
+      default: return status;
+    }
+  };
+
+  const displayedAppointments = viewMode === 'all'
+    ? appointments.filter(a => a.status !== 'CANCELLED').sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt))
+    : selectedDateAppointments;
 
   if (isLoading) {
     return (
@@ -166,7 +184,9 @@ export function TherapistDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Today</p>
-                  <p className="text-3xl font-bold text-primary">{todayAppointments.length}</p>
+                  <p className="text-3xl font-bold text-primary">
+                    {appointments.filter(a => new Date(a.scheduledAt).toDateString() === new Date().toDateString() && a.status !== 'CANCELLED').length}
+                  </p>
                 </div>
                 <Calendar className="text-primary" size={32} />
               </div>
@@ -216,17 +236,47 @@ export function TherapistDashboard() {
 
         <div className="grid lg:grid-cols-3 gap-8">
           <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle>Today's Schedule</CardTitle>
-              <CardDescription>{new Date().toLocaleDateString('en-US', {
-                weekday: 'long',
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric',
-              })}</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <div>
+                <CardTitle>Schedule</CardTitle>
+                <CardDescription>
+                  {viewMode === 'all' ? 'All Upcoming Appointments' : new Date(selectedDate).toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex bg-muted p-1 rounded-md">
+                  <Button 
+                    variant={viewMode === 'day' ? 'secondary' : 'ghost'} 
+                    size="sm" 
+                    onClick={() => setViewMode('day')}
+                  >
+                    By Day
+                  </Button>
+                  <Button 
+                    variant={viewMode === 'all' ? 'secondary' : 'ghost'} 
+                    size="sm" 
+                    onClick={() => setViewMode('all')}
+                  >
+                    View All
+                  </Button>
+                </div>
+                {viewMode === 'day' && (
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                )}
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {todayAppointments.map((appointment) => (
+              {displayedAppointments.map((appointment) => (
                 <div
                   key={appointment.id}
                   className="border rounded-lg p-4 hover:bg-muted/50 transition-colors"
@@ -237,6 +287,10 @@ export function TherapistDashboard() {
                         {appointment.patient?.user?.firstName || 'Unknown'} {appointment.patient?.user?.lastName || 'Patient'}
                       </h3>
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Calendar size={14} />
+                          {formatDate(appointment.scheduledAt)}
+                        </span>
                         <span className="flex items-center gap-1">
                           <Clock size={14} />
                           {formatTime(appointment.scheduledAt)}
@@ -250,11 +304,11 @@ export function TherapistDashboard() {
                       )}
                     </div>
                     <Badge className={getStatusColor(appointment.status)}>
-                      {appointment.status}
+                      {getStatusText(appointment.status)}
                     </Badge>
                   </div>
                   <div className="flex gap-2">
-                    {appointment.status === 'PENDING' && (
+                    {appointment.status === 'PAID' && (
                       <Button
                         size="sm"
                         className="bg-primary gap-2"
@@ -276,26 +330,29 @@ export function TherapistDashboard() {
                         Confirm
                       </Button>
                     )}
-                    {appointment.zoomMeetingUrl && (
-                      <a href={appointment.zoomMeetingUrl} target="_blank" rel="noopener noreferrer">
+
+                    {(appointment.status === 'CONFIRMED' || appointment.status === 'COMPLETED') && appointment.zoomMeetingUrl && (
+                      <a href={appointment.zoomJoinUrl || appointment.zoomMeetingUrl} target="_blank" rel="noopener noreferrer">
                         <Button size="sm" className="bg-primary gap-2">
                           <Video size={14} />
-                          Start Session
+                          Join Zoom
                         </Button>
                       </a>
                     )}
-                    <Link to={`/appointments/${appointment.id}/chat`}>
-                      <Button size="sm" variant="outline" className="gap-2">
-                        <MessageSquare size={14} />
-                        Chat
-                      </Button>
-                    </Link>
+                    {['PAID', 'CONFIRMED', 'COMPLETED'].includes(appointment.status) && (
+                      <Link to={`/appointments/${appointment.id}/chat`}>
+                        <Button size="sm" variant="outline" className="gap-2">
+                          <MessageSquare size={14} />
+                          Chat
+                        </Button>
+                      </Link>
+                    )}
                   </div>
                 </div>
               ))}
-              {todayAppointments.length === 0 && (
+              {displayedAppointments.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
-                  <p>No appointments scheduled for today</p>
+                  <p>No appointments found</p>
                 </div>
               )}
             </CardContent>

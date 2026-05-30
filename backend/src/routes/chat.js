@@ -31,7 +31,15 @@ router.get('/:appointmentId', authenticate, async (req, res, next) => {
       throw createError('Not authorized to view this chat', 403);
     }
 
-    const messages = await ChatMessage.find({ appointmentId })
+    const allowedStatuses = ['PAID', 'CONFIRMED', 'COMPLETED'];
+    if (!allowedStatuses.includes(appointment.status) && req.user.role !== 'ADMIN') {
+      throw createError('Chat is only available after payment confirmation', 400);
+    }
+
+    const messages = await ChatMessage.find({
+      patientId: appointment.patientId,
+      therapistId: appointment.therapistId
+    })
       .sort({ createdAt: 1 })
       .lean();
 
@@ -72,6 +80,11 @@ router.post('/:appointmentId', authenticate, async (req, res, next) => {
 
     if (!isPatient && !isTherapist) {
       throw createError('Not authorized to send messages', 403);
+    }
+
+    const allowedStatuses = ['PAID', 'CONFIRMED', 'COMPLETED'];
+    if (!allowedStatuses.includes(appointment.status)) {
+      throw createError('Chat is only available after payment confirmation', 400);
     }
 
     const message = new ChatMessage({

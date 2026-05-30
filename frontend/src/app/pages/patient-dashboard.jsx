@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Button } from '../components/ui/button.jsx';
 import { Badge } from '../components/ui/badge.jsx';
 import { Navbar } from '../components/navbar.jsx';
-import { Calendar, Video, Clock, User, LogOut, Brain, MessageSquare, Star } from 'lucide-react';
+import { Calendar, Video, Clock, User, LogOut, Brain, MessageSquare, Star, DollarSign } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../services/api.js';
 import { toast } from 'sonner';
@@ -55,10 +55,39 @@ export function PatientDashboard() {
     navigate('/');
   };
 
+  const handlePayment = async (appointmentId) => {
+    try {
+      const paymentRes = await api.payments.initiate(appointmentId);
+      
+      if (paymentRes.success && paymentRes.data) {
+        const { paymentUrl, params } = paymentRes.data;
+        
+        const form = document.createElement("form");
+        form.setAttribute("method", "POST");
+        form.setAttribute("action", paymentUrl);
+        
+        for (const key in params) {
+          const hiddenField = document.createElement("input");
+          hiddenField.setAttribute("type", "hidden");
+          hiddenField.setAttribute("name", key);
+          hiddenField.setAttribute("value", params[key]);
+          form.appendChild(hiddenField);
+        }
+        
+        document.body.appendChild(form);
+        form.submit();
+      }
+    } catch (error) {
+      toast.error(error.message || "Failed to initiate payment");
+    }
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'CONFIRMED':
         return 'bg-green-100 text-green-700 hover:bg-green-100';
+      case 'PAID':
+        return 'bg-blue-100 text-blue-700 hover:bg-blue-100';
       case 'PENDING':
         return 'bg-yellow-100 text-yellow-700 hover:bg-yellow-100';
       case 'COMPLETED':
@@ -67,6 +96,17 @@ export function PatientDashboard() {
         return 'bg-red-100 text-red-700 hover:bg-red-100';
       default:
         return 'bg-gray-100 text-gray-700';
+    }
+  };
+
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'PENDING': return 'Unpaid';
+      case 'PAID': return 'Paid';
+      case 'CONFIRMED': return 'Confirmed';
+      case 'COMPLETED': return 'Completed';
+      case 'CANCELLED': return 'Cancelled';
+      default: return status;
     }
   };
 
@@ -194,7 +234,7 @@ export function PatientDashboard() {
                       </div>
                     </div>
                     <Badge className={getStatusColor(appointment.status)}>
-                      {appointment.status}
+                      {getStatusText(appointment.status)}
                     </Badge>
                   </div>
                   <div className="flex gap-2">
@@ -206,12 +246,23 @@ export function PatientDashboard() {
                         </Button>
                       </a>
                     )}
-                    <Link to={`/appointments/${appointment.id}/chat`}>
-                      <Button size="sm" variant="outline" className="gap-2">
-                        <MessageSquare size={14} />
-                        Chat
+                    {['PAID', 'CONFIRMED', 'COMPLETED'].includes(appointment.status) ? (
+                      <Link to={`/appointments/${appointment.id}/chat`}>
+                        <Button size="sm" variant="outline" className="gap-2">
+                          <MessageSquare size={14} />
+                          Chat
+                        </Button>
+                      </Link>
+                    ) : appointment.status === 'PENDING' ? (
+                      <Button
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700 text-white gap-2"
+                        onClick={() => handlePayment(appointment.id)}
+                      >
+                        <DollarSign size={14} />
+                        Pay Now (eSewa)
                       </Button>
-                    </Link>
+                    ) : null}
                     <Button
                       size="sm"
                       variant="outline"
@@ -297,9 +348,6 @@ export function PatientDashboard() {
                   >
                     <div>
                       <h3 className="font-semibold text-primary">{result.predictedCategory}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Confidence: {(Number(result.confidence || 0.85) * 100).toFixed(1)}%
-                      </p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">

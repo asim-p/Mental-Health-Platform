@@ -2,6 +2,7 @@ import mongoose, { Schema } from 'mongoose';
 
 export const AppointmentStatus = {
   PENDING: 'PENDING',
+  PAID: 'PAID',
   CONFIRMED: 'CONFIRMED',
   COMPLETED: 'COMPLETED',
   CANCELLED: 'CANCELLED'

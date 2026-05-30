@@ -10,6 +10,7 @@ import appointmentRoutes from './routes/appointments.js';
 import screeningRoutes from './routes/screening.js';
 import chatRoutes from './routes/chat.js';
 import paymentRoutes from './routes/payments.js';
+import adminRoutes from './routes/admin.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 import mongoose from 'mongoose';
@@ -44,6 +45,7 @@ app.use('/api/appointments', appointmentRoutes);
 app.use('/api/screening', screeningRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

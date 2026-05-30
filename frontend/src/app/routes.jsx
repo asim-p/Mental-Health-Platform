@@ -3,6 +3,7 @@ import { LandingPage } from "./pages/landing-page.jsx";
 import { TherapistDirectory } from "./pages/therapist-directory.jsx";
 import { PatientDashboard } from "./pages/patient-dashboard.jsx";
 import { TherapistDashboard } from "./pages/therapist-dashboard.jsx";
+import { AdminDashboard } from "./pages/admin-dashboard.jsx";
 import { BookingPage } from "./pages/booking-page.jsx";
 import { LoginPage } from "./pages/login-page.jsx";
 import { RegisterPage } from "./pages/register-page.jsx";
@@ -15,6 +16,8 @@ import { ProtectedRoute } from "./components/protected-route.jsx";
 
 import { AboutPage } from "./pages/about-page.jsx";
 import { HowItWorksPage } from "./pages/how-it-works-page.jsx";
+import { PaymentStatus } from "./pages/payment-status.jsx";
+import { ChatPage } from "./pages/chat-page.jsx";
 
 export const router = createBrowserRouter([
   {
@@ -46,6 +49,30 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute allowedRoles={["PATIENT"]}>
         <BookingPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/payment/success",
+    element: (
+      <ProtectedRoute allowedRoles={["PATIENT"]}>
+        <PaymentStatus status="success" />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/payment/failure",
+    element: (
+      <ProtectedRoute allowedRoles={["PATIENT"]}>
+        <PaymentStatus status="failure" />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/appointments/:appointmentId/chat",
+    element: (
+      <ProtectedRoute allowedRoles={["PATIENT", "THERAPIST"]}>
+        <ChatPage />
       </ProtectedRoute>
     ),
   },
@@ -86,6 +113,14 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute allowedRoles={["THERAPIST"]}>
         <TherapistProfileSettings />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/dashboard/admin",
+    element: (
+      <ProtectedRoute allowedRoles={["ADMIN"]}>
+        <AdminDashboard />
       </ProtectedRoute>
     ),
   },

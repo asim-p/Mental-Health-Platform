@@ -8,12 +8,26 @@ import { authenticate, authorize } from '../middleware/auth.js';
 import { createError } from '../middleware/errorHandler.js';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
+import { createZoomMeeting } from '../services/zoom.js';
 
 const router = Router();
 
 router.get('/', authenticate, async (req, res, next) => {
   try {
     const { status, upcoming } = req.query;
+
+    // Auto-complete past confirmed appointments
+    await Appointment.updateMany({
+      status: 'CONFIRMED',
+      $expr: {
+        $lt: [
+          { $add: ["$scheduledAt", { $multiply: [{ $ifNull: ["$duration", 60] }, 60000] }] },
+          new Date()
+        ]
+      }
+    }, {
+      $set: { status: 'COMPLETED' }
+    });
 
     let where = {};
 
@@ -116,7 +130,10 @@ router.get('/:id', authenticate, async (req, res, next) => {
       delete appointment.paymentId;
     }
 
-    appointment.chatMessages = await ChatMessage.find({ appointmentId: appointment._id }).sort({ createdAt: 1 }).lean();
+    appointment.chatMessages = await ChatMessage.find({
+      patientId: appointment.patient._id,
+      therapistId: appointment.therapist._id
+    }).sort({ createdAt: 1 }).lean();
 
     res.json({
       success: true,
@@ -194,15 +211,38 @@ router.patch('/:id/confirm', authenticate, authorize('THERAPIST', 'ADMIN'), asyn
   try {
     const { id } = req.params;
 
-    const appointment = await Appointment.findByIdAndUpdate(id, {
+    const appointment = await Appointment.findById(id).populate({
+      path: 'patientId',
+      populate: { path: 'user', select: 'firstName lastName' }
+    });
+
+    if (!appointment) {
+      throw createError('Appointment not found', 404);
+    }
+
+    if (appointment.status !== 'PAID') {
+      throw createError('Cannot confirm appointment before payment is completed', 400);
+    }
+
+    const patientName = appointment.patientId?.user
+      ? `${appointment.patientId.user.firstName} ${appointment.patientId.user.lastName}`
+      : 'Patient';
+
+    const zoomUrls = await createZoomMeeting(
+      appointment.scheduledAt,
+      appointment.duration || 60,
+      patientName
+    );
+
+    const updatedAppointment = await Appointment.findByIdAndUpdate(id, {
       status: 'CONFIRMED',
-      zoomMeetingUrl: `https://zoom.us/j/${uuidv4().replace(/-/g, '').substring(0, 10)}`,
-      zoomJoinUrl: `https://zoom.us/j/${uuidv4().replace(/-/g, '').substring(0, 10)}`,
+      zoomMeetingUrl: zoomUrls.zoomMeetingUrl,
+      zoomJoinUrl: zoomUrls.zoomJoinUrl,
     }, { new: true });
 
     res.json({
       success: true,
-      data: appointment,
+      data: updatedAppointment,
     });
   } catch (error) {
     next(error);
