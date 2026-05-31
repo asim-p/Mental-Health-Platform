@@ -18,7 +18,8 @@ const AppointmentSchema = new Schema({
   zoomMeetingUrl: { type: String },
   zoomJoinUrl: { type: String },
   notes: { type: String },
-  aiPrediction: { type: String }
+  aiPrediction: { type: String },
+  therapistNote: { type: String }
 }, {
   timestamps: true,
   toJSON: {

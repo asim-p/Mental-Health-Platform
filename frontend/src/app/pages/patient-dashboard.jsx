@@ -4,13 +4,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Button } from '../components/ui/button.jsx';
 import { Badge } from '../components/ui/badge.jsx';
 import { Navbar } from '../components/navbar.jsx';
-import { Calendar, Video, Clock, User, LogOut, Brain, MessageSquare, Star, DollarSign } from 'lucide-react';
+import { Calendar, Video, Clock, Brain, MessageSquare, DollarSign } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../services/api.js';
 import { toast } from 'sonner';
 
 export function PatientDashboard() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [upcomingAppointments, setUpcomingAppointments] = useState([]);
   const [pastAppointments, setPastAppointments] = useState([]);
@@ -50,11 +50,6 @@ export function PatientDashboard() {
     fetchData();
   }, [user, navigate]);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-  };
-
   const handlePayment = async (appointmentId) => {
     try {
       const paymentRes = await api.payments.initiate(appointmentId);
@@ -87,7 +82,7 @@ export function PatientDashboard() {
       case 'CONFIRMED':
         return 'bg-green-100 text-green-700 hover:bg-green-100';
       case 'PAID':
-        return 'bg-blue-100 text-blue-700 hover:bg-blue-100';
+        return 'bg-orange-100 text-orange-700 hover:bg-orange-100';
       case 'PENDING':
         return 'bg-yellow-100 text-yellow-700 hover:bg-yellow-100';
       case 'COMPLETED':
@@ -101,8 +96,8 @@ export function PatientDashboard() {
 
   const getStatusText = (status) => {
     switch (status) {
-      case 'PENDING': return 'Unpaid';
-      case 'PAID': return 'Paid';
+      case 'PENDING': return 'Awaiting Payment';
+      case 'PAID': return 'Awaiting Confirmation';
       case 'CONFIRMED': return 'Confirmed';
       case 'COMPLETED': return 'Completed';
       case 'CANCELLED': return 'Cancelled';
@@ -147,10 +142,6 @@ export function PatientDashboard() {
               Manage your appointments and mental health journey
             </p>
           </div>
-          <Button variant="outline" onClick={handleLogout} className="gap-2">
-            <LogOut size={16} />
-            Logout
-          </Button>
         </div>
 
         <div className="grid md:grid-cols-4 gap-4 mb-8">
@@ -238,7 +229,7 @@ export function PatientDashboard() {
                     </Badge>
                   </div>
                   <div className="flex gap-2">
-                    {appointment.zoomJoinUrl && (
+                    {appointment.status === 'CONFIRMED' && appointment.zoomJoinUrl && (
                       <a href={appointment.zoomJoinUrl} target="_blank" rel="noopener noreferrer">
                         <Button size="sm" className="bg-primary gap-2">
                           <Video size={14} />
@@ -344,12 +335,17 @@ export function PatientDashboard() {
                 {screeningHistory.slice(0, 3).map((result) => (
                   <div
                     key={result.id}
-                    className="border rounded-lg p-4 flex justify-between items-center"
+                    className="border rounded-lg p-4 flex justify-between items-center gap-4"
                   >
-                    <div>
+                    <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-primary">{result.predictedCategory}</h3>
+                      {result.confidence != null && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Confidence: {result.confidence.toFixed(2)}
+                        </p>
+                      )}
                     </div>
-                    <div className="text-right">
+                    <div className="text-right flex-shrink-0">
                       <p className="text-sm text-muted-foreground">
                         {formatDate(result.createdAt)}
                       </p>
@@ -369,35 +365,6 @@ export function PatientDashboard() {
           </Card>
         )}
 
-        <Card className="mt-8">
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-4 gap-4">
-              <Link to="/screening">
-                <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
-                  <Brain size={24} />
-                  <span>AI Screening</span>
-                </Button>
-              </Link>
-              <Link to="/therapists">
-                <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
-                  <Calendar size={24} />
-                  <span>Find Therapist</span>
-                </Button>
-              </Link>
-              <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
-                <User size={24} />
-                <span>Profile</span>
-              </Button>
-              <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
-                <Video size={24} />
-                <span>Test Video</span>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

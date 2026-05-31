@@ -27,7 +27,7 @@ export function ScreeningResults() {
   const [isLoadingRecs, setIsLoadingRecs] = useState(false);
 
   const symptomText = location.state?.symptomText || '';
-  const preferences = location.state?.preferences || { budget: 'any', gender: 'any' };
+  const preferences = location.state?.preferences || { budget: 'any', gender: 'any', language: 'any' };
 
   useEffect(() => {
     if (!symptomText) {
@@ -114,14 +114,20 @@ export function ScreeningResults() {
             <div className="w-24 h-24 bg-primary/10 rounded-3xl flex items-center justify-center flex-shrink-0">
               <Brain className="text-primary" size={48} />
             </div>
-            <div>
+            <div className="flex-1">
               <p className="text-primary font-bold uppercase tracking-widest text-sm mb-2">Analysis Complete</p>
               <h1 className="text-3xl md:text-4xl font-black mb-4">
                 You're likely showing signs of <span className="text-primary">{result.category}</span>
               </h1>
-              <p className="text-lg text-muted-foreground max-w-2xl">
+              <p className="text-lg text-muted-foreground max-w-2xl mb-5">
                 {getCategoryDescription(result.category)}
               </p>
+
+              {result.confidence != null && (
+                <p className="text-sm text-muted-foreground">
+                  Model confidence: <span className="font-semibold text-foreground">{result.confidence.toFixed(2)}</span>
+                </p>
+              )}
             </div>
           </div>
         </div>

@@ -79,22 +79,22 @@ export function SymptomScreening() {
 
   const examplePrompts = [
     {
-      title: 'Feeling Overwhelmed',
-      text: 'I feel constantly worried about everything. My heart races and I have trouble sleeping at night. Sometimes I feel like I cannot breathe properly.',
+      title: 'Anxiety',
+      text: 'I suffer from severe anxiety and panic attacks almost every day. I have intense, uncontrollable anxiety about ordinary situations. My anxiety causes my heart to race, my palms to sweat, and I hyperventilate. I have anxious thoughts that I cannot stop. I feel anxious and panicked for no clear reason. My anxiety is ruining my life and I avoid going out because of my anxiety disorder.',
       icon: AlertCircle,
       color: 'text-orange-500',
     },
     {
-      title: 'Loss of Interest',
-      text: "I've lost interest in things I used to enjoy. I feel hopeless and tired all the time. Even getting out of bed feels difficult these days.",
+      title: 'Depression',
+      text: "I have not felt like myself in months. I have no energy, no motivation, and no interest in anything I used to love. Every day feels heavy and pointless. I sleep too much but still feel exhausted. I feel completely empty inside, like nothing will ever get better.",
       icon: Brain,
       color: 'text-blue-500',
     },
     {
-      title: 'Relationship Issues',
-      text: "I'm having constant arguments with my partner and feel disconnected from loved ones. Family expectations are adding more stress to my life.",
+      title: 'Suicidal Thoughts',
+      text: "I have been having thoughts of ending my life. I feel like a burden to everyone around me and that the world would be better off without me. I see no way out of the pain I am feeling. I have thought about how I would do it. I do not want to feel this way but I cannot see any other option.",
       icon: Lightbulb,
-      color: 'text-purple-500',
+      color: 'text-red-500',
     },
   ];
 

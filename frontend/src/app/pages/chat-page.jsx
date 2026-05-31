@@ -80,8 +80,8 @@ export function ChatPage() {
   useEffect(() => {
     if (!appointmentId || !user || !appointment) return;
 
-    const allowedStatuses = ["CONFIRMED", "COMPLETED"];
-    if (!allowedStatuses.includes(appointment.status)) return; // Don't connect socket if payment is not confirmed
+    const allowedStatuses = ["PAID", "CONFIRMED", "COMPLETED"];
+    if (!allowedStatuses.includes(appointment.status)) return;
 
     const socket = io(SOCKET_URL);
     socketRef.current = socket;
@@ -208,10 +208,27 @@ export function ChatPage() {
     );
   }
 
-  // Check if paid
-  const isPaid = ["CONFIRMED", "COMPLETED"].includes(appointment.status);
+  // Unlock chat once payment is received — backend allows PAID, CONFIRMED, COMPLETED
+  const isPaid = ["PAID", "CONFIRMED", "COMPLETED"].includes(appointment.status);
+  const isCancelled = appointment.status === 'CANCELLED';
 
   // Locked Screen render
+  if (isCancelled) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col">
+        <Navbar />
+        <div className="flex-1 max-w-md mx-auto px-4 py-16 text-center flex flex-col items-center justify-center">
+          <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
+          <h3 className="text-xl font-bold mb-2">Appointment Cancelled</h3>
+          <p className="text-gray-500 mb-6">This appointment has been cancelled and the consultation room is no longer available.</p>
+          <Button onClick={() => navigate(user?.role === 'THERAPIST' ? '/dashboard/therapist' : '/dashboard/patient')}>
+            Go to Dashboard
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   if (!isPaid) {
     const therapistName = `Dr. ${appointment.therapist?.user?.firstName} ${appointment.therapist?.user?.lastName}`;
     const patientName = `${appointment.patient?.user?.firstName} ${appointment.patient?.user?.lastName}`;
@@ -375,7 +392,7 @@ export function ChatPage() {
               </div>
 
               {/* Zoom Meeting Link */}
-              {(appointment.zoomJoinUrl || appointment.zoomMeetingUrl) && (
+              {appointment.status === 'CONFIRMED' && (appointment.zoomJoinUrl || appointment.zoomMeetingUrl) && (
                 <div className="space-y-3 pt-2">
                   <h4 className="font-semibold text-slate-700 text-xs tracking-wider uppercase">Video Room</h4>
                   <a 
@@ -419,7 +436,7 @@ export function ChatPage() {
               </div>
 
               {/* Mobile Video Call launcher */}
-              {(appointment.zoomJoinUrl || appointment.zoomMeetingUrl) && (
+              {appointment.status === 'CONFIRMED' && (appointment.zoomJoinUrl || appointment.zoomMeetingUrl) && (
                 <a 
                   href={isUserPatient ? appointment.zoomJoinUrl : appointment.zoomMeetingUrl} 
                   target="_blank" 

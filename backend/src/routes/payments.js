@@ -7,6 +7,7 @@ import { authenticate } from '../middleware/auth.js';
 import { createError } from '../middleware/errorHandler.js';
 import { createHmac } from 'crypto';
 import { createZoomMeeting } from '../services/zoom.js';
+import { createNotification } from '../services/notification.js';
 
 const router = Router();
 
@@ -125,6 +126,31 @@ router.post('/verify', async (req, res, next) => {
 
     appointment.status = 'PAID';
     await appointment.save();
+
+    const paidDate = new Date(appointment.scheduledAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
+    // Notify the therapist that payment was received
+    const therapistDoc = await TherapistProfile.findById(appointment.therapistId);
+    if (therapistDoc) {
+      await createNotification({
+        userId: therapistDoc.user,
+        type: 'PAYMENT_RECEIVED',
+        title: 'Payment Received',
+        message: `Payment of NPR ${payment.amount} has been received for the appointment on ${paidDate}. Please confirm the session.`,
+        appointmentId: appointment._id,
+      });
+    }
+
+    // Notify the patient that payment was successful
+    if (appointment.patientId?.user?._id) {
+      await createNotification({
+        userId: appointment.patientId.user._id,
+        type: 'PAYMENT_RECEIVED',
+        title: 'Payment Successful',
+        message: `Your payment of NPR ${payment.amount} was received. Awaiting therapist confirmation for ${paidDate}.`,
+        appointmentId: appointment._id,
+      });
+    }
 
     res.json({
       success: true,

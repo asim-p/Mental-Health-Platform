@@ -66,7 +66,7 @@ export function PaymentStatus({ status }) {
             <>
               <CheckCircle2 className="w-16 h-16 text-green-500 mb-6" />
               <h2 className="text-2xl font-bold mb-2">Payment Successful</h2>
-              <p className="text-gray-600 mb-8">Your appointment has been successfully confirmed.</p>
+              <p className="text-gray-600 mb-8">Your payment was received. Your therapist will confirm the session shortly — you can now access the consultation room.</p>
             </>
           )}
           <Button 

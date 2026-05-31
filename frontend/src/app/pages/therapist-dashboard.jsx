@@ -9,26 +9,31 @@ import {
   Video,
   Clock,
   DollarSign,
-  LogOut,
   User,
   Settings,
   CheckCircle,
   XCircle,
-  Star,
   MessageSquare,
+  FileText,
+  ChevronDown,
+  ChevronUp,
+  Save,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../services/api.js';
 import { toast } from 'sonner';
 
 export function TherapistDashboard() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [appointments, setAppointments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [profile, setProfile] = useState(null);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [viewMode, setViewMode] = useState('day'); // 'day' or 'all'
+  const [viewMode, setViewMode] = useState('day');
+  const [openNoteId, setOpenNoteId] = useState(null);
+  const [noteValues, setNoteValues] = useState({});
+  const [savingNoteId, setSavingNoteId] = useState(null);
 
   useEffect(() => {
     if (!user) {
@@ -45,6 +50,11 @@ export function TherapistDashboard() {
 
         if (appointmentsRes.success && appointmentsRes.data) {
           setAppointments(appointmentsRes.data);
+          const initialNotes = {};
+          appointmentsRes.data.forEach((a) => {
+            initialNotes[a.id] = a.therapistNote || '';
+          });
+          setNoteValues(initialNotes);
         }
         if (profileRes.success && profileRes.data) {
           setProfile(profileRes.data);
@@ -59,10 +69,6 @@ export function TherapistDashboard() {
     fetchData();
   }, [user, navigate]);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-  };
 
   const selectedDateAppointments = appointments.filter((a) => {
     const appointmentDate = new Date(a.scheduledAt).toISOString().split('T')[0];
@@ -102,7 +108,7 @@ export function TherapistDashboard() {
       case 'CONFIRMED':
         return 'bg-green-100 text-green-700';
       case 'PAID':
-        return 'bg-blue-100 text-blue-700';
+        return 'bg-orange-100 text-orange-700';
       case 'PENDING':
         return 'bg-yellow-100 text-yellow-700';
       case 'COMPLETED':
@@ -116,12 +122,28 @@ export function TherapistDashboard() {
 
   const getStatusText = (status) => {
     switch (status) {
-      case 'PENDING': return 'Unpaid';
-      case 'PAID': return 'Paid';
+      case 'PENDING': return 'Awaiting Payment';
+      case 'PAID': return 'Awaiting Confirmation';
       case 'CONFIRMED': return 'Confirmed';
       case 'COMPLETED': return 'Completed';
       case 'CANCELLED': return 'Cancelled';
       default: return status;
+    }
+  };
+
+  const handleSaveNote = async (appointmentId) => {
+    try {
+      setSavingNoteId(appointmentId);
+      await api.appointments.saveNote(appointmentId, noteValues[appointmentId] || '');
+      setAppointments((prev) =>
+        prev.map((a) => a.id === appointmentId ? { ...a, therapistNote: noteValues[appointmentId] } : a)
+      );
+      toast.success('Session note saved');
+      setOpenNoteId(null);
+    } catch {
+      toast.error('Failed to save note');
+    } finally {
+      setSavingNoteId(null);
     }
   };
 
@@ -162,10 +184,6 @@ export function TherapistDashboard() {
               {profile?.specialization?.join(', ') || 'Mental Health Professional'}
             </p>
           </div>
-          <Button variant="outline" onClick={handleLogout} className="gap-2">
-            <LogOut size={16} />
-            Logout
-          </Button>
         </div>
 
         {!profile?.isVerified && (
@@ -211,7 +229,7 @@ export function TherapistDashboard() {
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Total Clients</p>
                   <p className="text-3xl font-bold">
-                    {new Set(appointments.map((a) => a.patientId)).size}
+                    {new Set(appointments.map((a) => a.patient?.user?.id).filter(Boolean)).size}
                   </p>
                 </div>
                 <User className="text-muted-foreground" size={32} />
@@ -297,11 +315,6 @@ export function TherapistDashboard() {
                         </span>
                         <span>{appointment.duration || 60} min</span>
                       </div>
-                      {appointment.aiPrediction && (
-                        <p className="text-xs text-primary mt-1">
-                          AI Prediction: {appointment.aiPrediction}
-                        </p>
-                      )}
                     </div>
                     <Badge className={getStatusColor(appointment.status)}>
                       {getStatusText(appointment.status)}
@@ -314,11 +327,13 @@ export function TherapistDashboard() {
                         className="bg-primary gap-2"
                         onClick={async () => {
                           try {
-                            await api.appointments.confirm(appointment.id);
+                            const res = await api.appointments.confirm(appointment.id);
                             toast.success('Appointment confirmed');
                             setAppointments((prev) =>
                               prev.map((a) =>
-                                a.id === appointment.id ? { ...a, status: 'CONFIRMED' } : a
+                                a.id === appointment.id
+                                  ? { ...a, status: 'CONFIRMED', zoomMeetingUrl: res.data?.zoomMeetingUrl, zoomJoinUrl: res.data?.zoomJoinUrl }
+                                  : a
                               )
                             );
                           } catch {
@@ -331,8 +346,8 @@ export function TherapistDashboard() {
                       </Button>
                     )}
 
-                    {(appointment.status === 'CONFIRMED' || appointment.status === 'COMPLETED') && appointment.zoomMeetingUrl && (
-                      <a href={appointment.zoomJoinUrl || appointment.zoomMeetingUrl} target="_blank" rel="noopener noreferrer">
+                    {appointment.status === 'CONFIRMED' && appointment.zoomMeetingUrl && (
+                      <a href={appointment.zoomMeetingUrl} target="_blank" rel="noopener noreferrer">
                         <Button size="sm" className="bg-primary gap-2">
                           <Video size={14} />
                           Join Zoom
@@ -347,7 +362,54 @@ export function TherapistDashboard() {
                         </Button>
                       </Link>
                     )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-2 ml-auto"
+                      onClick={() => setOpenNoteId(openNoteId === appointment.id ? null : appointment.id)}
+                    >
+                      <FileText size={14} />
+                      {appointment.therapistNote ? 'Edit Note' : 'Add Note'}
+                      {openNoteId === appointment.id ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                    </Button>
                   </div>
+
+                  {openNoteId === appointment.id && (
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                        Session Note — private, visible only to you
+                      </p>
+                      <textarea
+                        className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:border-primary min-h-[100px]"
+                        placeholder="Write your clinical observations, treatment notes, or follow-up actions for this session..."
+                        value={noteValues[appointment.id] ?? ''}
+                        onChange={(e) =>
+                          setNoteValues((prev) => ({ ...prev, [appointment.id]: e.target.value }))
+                        }
+                      />
+                      <div className="flex justify-end gap-2 mt-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setNoteValues((prev) => ({ ...prev, [appointment.id]: appointment.therapistNote || '' }));
+                            setOpenNoteId(null);
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="gap-2"
+                          disabled={savingNoteId === appointment.id}
+                          onClick={() => handleSaveNote(appointment.id)}
+                        >
+                          <Save size={13} />
+                          {savingNoteId === appointment.id ? 'Saving...' : 'Save Note'}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
               {displayedAppointments.length === 0 && (

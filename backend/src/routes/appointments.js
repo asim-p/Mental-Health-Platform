@@ -9,6 +9,7 @@ import { createError } from '../middleware/errorHandler.js';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import { createZoomMeeting } from '../services/zoom.js';
+import { createNotification } from '../services/notification.js';
 
 const router = Router();
 
@@ -198,6 +199,15 @@ router.post('/', authenticate, authorize('PATIENT'), async (req, res, next) => {
     appointment.paymentId = payment._id;
     await appointment.save();
 
+    const scheduledDate = new Date(data.scheduledAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    await createNotification({
+      userId: therapistProfile.user._id,
+      type: 'APPOINTMENT_BOOKED',
+      title: 'New Appointment Request',
+      message: `A patient has booked a session scheduled for ${scheduledDate}.`,
+      appointmentId: appointment._id,
+    });
+
     res.status(201).json({
       success: true,
       data: appointment,
@@ -240,10 +250,44 @@ router.patch('/:id/confirm', authenticate, authorize('THERAPIST', 'ADMIN'), asyn
       zoomJoinUrl: zoomUrls.zoomJoinUrl,
     }, { new: true });
 
+    const confirmedDate = new Date(appointment.scheduledAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    if (appointment.patientId?.user?._id) {
+      await createNotification({
+        userId: appointment.patientId.user._id,
+        type: 'APPOINTMENT_CONFIRMED',
+        title: 'Appointment Confirmed',
+        message: `Your appointment on ${confirmedDate} has been confirmed. Your session link is now ready.`,
+        appointmentId: appointment._id,
+      });
+    }
+
     res.json({
       success: true,
       data: updatedAppointment,
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch('/:id/note', authenticate, authorize('THERAPIST'), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { therapistNote } = req.body;
+
+    const therapistProfile = await TherapistProfile.findOne({ user: req.user.id });
+    const appointment = await Appointment.findById(id);
+
+    if (!appointment) throw createError('Appointment not found', 404);
+
+    if (appointment.therapistId.toString() !== therapistProfile?._id.toString()) {
+      throw createError('Not authorized to add notes to this appointment', 403);
+    }
+
+    appointment.therapistNote = therapistNote ?? '';
+    await appointment.save();
+
+    res.json({ success: true, data: appointment });
   } catch (error) {
     next(error);
   }
@@ -293,62 +337,35 @@ router.patch('/:id/cancel', authenticate, async (req, res, next) => {
       await Payment.findByIdAndUpdate(appointment.paymentId, { status: 'REFUNDED' });
     }
 
+    const cancelledDate = new Date(appointment.scheduledAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
+    if (isPatient) {
+      const therapistDoc = await TherapistProfile.findById(appointment.therapistId);
+      if (therapistDoc) {
+        await createNotification({
+          userId: therapistDoc.user,
+          type: 'APPOINTMENT_CANCELLED',
+          title: 'Appointment Cancelled',
+          message: `A patient has cancelled their appointment scheduled for ${cancelledDate}.`,
+          appointmentId: appointment._id,
+        });
+      }
+    } else if (isTherapist) {
+      const patientDoc = await PatientProfile.findById(appointment.patientId);
+      if (patientDoc) {
+        await createNotification({
+          userId: patientDoc.user,
+          type: 'APPOINTMENT_CANCELLED',
+          title: 'Appointment Cancelled',
+          message: `Your appointment on ${cancelledDate} has been cancelled by your therapist.`,
+          appointmentId: appointment._id,
+        });
+      }
+    }
+
     res.json({
       success: true,
       data: appointment,
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-router.post('/:id/review', authenticate, authorize('PATIENT'), async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { rating, comment } = req.body;
-
-    const appointment = await Appointment.findById(id);
-
-    if (!appointment || appointment.status !== 'COMPLETED') {
-      throw createError('Cannot review incomplete appointment', 400);
-    }
-
-    const patientProfile = await PatientProfile.findOne({ user: req.user.id });
-
-    if (appointment.patientId.toString() !== patientProfile?._id.toString()) {
-      throw createError('Not authorized to review this appointment', 403);
-    }
-
-    const existingReview = await Review.findOne({ appointmentId: id });
-
-    if (existingReview) {
-      throw createError('Already reviewed this appointment', 400);
-    }
-
-    const review = new Review({
-      appointmentId: id,
-      therapistId: appointment.therapistId,
-      patientId: patientProfile._id,
-      rating,
-      comment,
-    });
-
-    await review.save();
-
-    const therapistProfile = await TherapistProfile.findById(appointment.therapistId);
-
-    if (therapistProfile) {
-      const totalRating = therapistProfile.rating * therapistProfile.reviewCount + rating;
-      const newReviewCount = therapistProfile.reviewCount + 1;
-
-      therapistProfile.rating = totalRating / newReviewCount;
-      therapistProfile.reviewCount = newReviewCount;
-      await therapistProfile.save();
-    }
-
-    res.status(201).json({
-      success: true,
-      data: review,
     });
   } catch (error) {
     next(error);

@@ -4,13 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Button } from '../components/ui/button.jsx';
 import { Badge } from '../components/ui/badge.jsx';
 import { Navbar } from '../components/navbar.jsx';
-import { Users, UserCheck, ShieldAlert, DollarSign, Calendar, LogOut, CheckCircle, XCircle, Trash2 } from 'lucide-react';
+import { Users, UserCheck, ShieldAlert, DollarSign, Calendar, CheckCircle, XCircle, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../services/api.js';
 import { toast } from 'sonner';
 
 export function AdminDashboard() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   
   const [stats, setStats] = useState(null);
@@ -46,11 +46,6 @@ export function AdminDashboard() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleLogout = () => {
-    logout();
-    navigate('/');
   };
 
   const handleVerifyTherapist = async (id, action) => {
@@ -99,10 +94,6 @@ export function AdminDashboard() {
             </h1>
             <p className="text-muted-foreground">Manage users and platform operations</p>
           </div>
-          <Button variant="outline" onClick={handleLogout} className="gap-2">
-            <LogOut size={16} />
-            Logout
-          </Button>
         </div>
 
         {/* Stats Grid */}

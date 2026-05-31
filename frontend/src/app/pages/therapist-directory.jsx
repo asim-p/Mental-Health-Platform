@@ -26,6 +26,7 @@ export function TherapistDirectory() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSpecialties, setSelectedSpecialties] = useState([]);
   const [selectedLanguages, setSelectedLanguages] = useState([]);
+  const [selectedGender, setSelectedGender] = useState("any");
   const [priceRange, setPriceRange] = useState([0, 5000]);
   const [showFilters, setShowFilters] = useState(false);
   const [therapists, setTherapists] = useState([]);
@@ -42,8 +43,9 @@ export function TherapistDirectory() {
       };
 
       if (searchQuery) params.search = searchQuery;
-      if (selectedSpecialties.length > 0) params.specialty = selectedSpecialties[0]; 
+      if (selectedSpecialties.length > 0) params.specialty = selectedSpecialties[0];
       if (selectedLanguages.length > 0) params.language = selectedLanguages[0];
+      if (selectedGender !== "any") params.gender = selectedGender;
       if (priceRange[0] > 0) params.minPrice = priceRange[0].toString();
       if (priceRange[1] < 5000) params.maxPrice = priceRange[1].toString();
 
@@ -58,8 +60,6 @@ export function TherapistDirectory() {
           languages: t.languages,
           pricePerSession: t.hourlyRate,
           verified: t.isVerified,
-          rating: t.rating,
-          totalSessions: t.reviewCount,
           bio: t.bio || "",
           education: t.qualifications?.join(", ") || "",
           experience: t.yearsOfExperience || 0,
@@ -72,7 +72,7 @@ export function TherapistDirectory() {
     } finally {
       setIsLoading(false);
     }
-  }, [searchQuery, selectedSpecialties, selectedLanguages, priceRange]);
+  }, [searchQuery, selectedSpecialties, selectedLanguages, selectedGender, priceRange]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -192,6 +192,31 @@ export function TherapistDirectory() {
                   </div>
                 </div>
 
+                {/* Gender Filter */}
+                <div>
+                  <Label className="text-base font-semibold mb-3 block">
+                    Therapist Gender
+                  </Label>
+                  <div className="space-y-2">
+                    {["any", "Male", "Female", "Other"].map((g) => (
+                      <div key={g} className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          id={`gender-${g}`}
+                          name="gender"
+                          value={g}
+                          checked={selectedGender === g}
+                          onChange={() => setSelectedGender(g)}
+                          className="accent-green-600"
+                        />
+                        <label htmlFor={`gender-${g}`} className="text-sm cursor-pointer">
+                          {g === "any" ? "Any" : g}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Price Range Filter */}
                 <div>
                   <Label className="text-base font-semibold mb-3 block">
@@ -216,6 +241,7 @@ export function TherapistDirectory() {
                 {/* Clear Filters */}
                 {(selectedSpecialties.length > 0 ||
                   selectedLanguages.length > 0 ||
+                  selectedGender !== "any" ||
                   priceRange[0] !== 0 ||
                   priceRange[1] !== 3000) && (
                   <Button
@@ -224,6 +250,7 @@ export function TherapistDirectory() {
                     onClick={() => {
                       setSelectedSpecialties([]);
                       setSelectedLanguages([]);
+                      setSelectedGender("any");
                       setPriceRange([0, 3000]);
                       setSearchQuery("");
                     }}

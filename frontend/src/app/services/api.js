@@ -95,8 +95,8 @@ class ApiService {
     create: (data) => this.request('/appointments', { method: 'POST', body: data }),
     confirm: (id) => this.request(`/appointments/${id}/confirm`, { method: 'PATCH' }),
     complete: (id) => this.request(`/appointments/${id}/complete`, { method: 'PATCH' }),
+    saveNote: (id, therapistNote) => this.request(`/appointments/${id}/note`, { method: 'PATCH', body: { therapistNote } }),
     cancel: (id, reason) => this.request(`/appointments/${id}/cancel`, { method: 'PATCH', body: { reason } }),
-    review: (id, rating, comment) => this.request(`/appointments/${id}/review`, { method: 'POST', body: { rating, comment } }),
   };
 
   screening = {
@@ -112,6 +112,13 @@ class ApiService {
     getMessages: (appointmentId) => this.request(`/chat/${appointmentId}`),
     sendMessage: (appointmentId, content) => this.request(`/chat/${appointmentId}`, { method: 'POST', body: { content } }),
     markAsRead: (messageId) => this.request(`/chat/${messageId}/read`, { method: 'PATCH' }),
+  };
+
+  notifications = {
+    getAll: () => this.request('/notifications'),
+    markAsRead: (id) => this.request(`/notifications/${id}/read`, { method: 'PATCH' }),
+    markAllAsRead: () => this.request('/notifications/read-all', { method: 'PATCH' }),
+    delete: (id) => this.request(`/notifications/${id}`, { method: 'DELETE' }),
   };
 
   payments = {

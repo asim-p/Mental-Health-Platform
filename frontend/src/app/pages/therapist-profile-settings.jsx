@@ -10,6 +10,7 @@ import { api } from '../services/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { toast } from 'sonner';
 import { Loader2, Save, User, DollarSign, BookOpen } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group.jsx';
 
 const CORE_SPECIALTIES = [
   "General Consultation",
@@ -35,6 +36,7 @@ export function TherapistProfileSettings() {
     qualifications: '',
     yearsOfExperience: '',
     languages: [],
+    gender: '',
   });
   const [otherSpecialty, setOtherSpecialty] = useState('');
   const [otherLanguage, setOtherLanguage] = useState('');
@@ -57,6 +59,7 @@ export function TherapistProfileSettings() {
             qualifications: profile.qualifications?.join(', ') || '',
             yearsOfExperience: profile.yearsOfExperience || '',
             languages: profile.languages || [],
+            gender: profile.gender || '',
           });
         }
       } catch (error) {
@@ -153,6 +156,27 @@ export function TherapistProfileSettings() {
                     value={formData.bio}
                     onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label>Gender</Label>
+                  <RadioGroup
+                    value={formData.gender}
+                    onValueChange={(val) => setFormData({ ...formData, gender: val })}
+                    className="flex gap-6"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="Male" id="g-male" />
+                      <Label htmlFor="g-male" className="cursor-pointer">Male</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="Female" id="g-female" />
+                      <Label htmlFor="g-female" className="cursor-pointer">Female</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="Other" id="g-other" />
+                      <Label htmlFor="g-other" className="cursor-pointer">Other</Label>
+                    </div>
+                  </RadioGroup>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">

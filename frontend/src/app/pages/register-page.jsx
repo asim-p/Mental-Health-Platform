@@ -141,7 +141,7 @@ export function RegisterPage() {
           hourlyRate: parseFloat(therapistForm.hourlyRate) || 0,
           gender: therapistForm.gender,
           languages: therapistForm.languages,
-          qualifications: therapistForm.qualifications.split(',').map((s) => s.trim()),
+          qualifications: therapistForm.qualifications.split(',').map((s) => s.trim()).filter(Boolean),
         },
       });
 

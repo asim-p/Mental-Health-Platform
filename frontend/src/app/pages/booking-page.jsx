@@ -24,7 +24,6 @@ export function BookingPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedTime, setSelectedTime] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("esewa");
 
   useEffect(() => {
     if (isAuthLoading) return;
@@ -280,7 +279,11 @@ export function BookingPage() {
                         selected={selectedDate}
                         onSelect={setSelectedDate}
                         className="rounded-md border"
-                        disabled={(date) => date < new Date()}
+                        disabled={(date) => {
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          return date < today;
+                        }}
                       />
                     </div>
                   </div>

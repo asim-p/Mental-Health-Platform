@@ -11,9 +11,12 @@ import screeningRoutes from './routes/screening.js';
 import chatRoutes from './routes/chat.js';
 import paymentRoutes from './routes/payments.js';
 import adminRoutes from './routes/admin.js';
+import notificationRoutes from './routes/notifications.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { setIO } from './socket.js';
 
 import mongoose from 'mongoose';
+import Appointment from './models/Appointment.js';
 
 dotenv.config();
 
@@ -31,6 +34,8 @@ export const io = new SocketIOServer(httpServer, {
   },
 });
 
+setIO(io);
+
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true,
@@ -46,6 +51,7 @@ app.use('/api/screening', screeningRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -65,6 +71,10 @@ io.on('connection', (socket) => {
     socket.leave(`appointment:${appointmentId}`);
   });
 
+  socket.on('join_user', (userId) => {
+    socket.join(`user:${userId}`);
+  });
+
   socket.on('send_message', (data) => {
     io.to(`appointment:${data.appointmentId}`).emit('new_message', data);
   });
@@ -73,6 +83,30 @@ io.on('connection', (socket) => {
     console.log('Client disconnected:', socket.id);
   });
 });
+
+// Auto-complete confirmed appointments whose scheduled time + duration has passed
+const autoCompleteAppointments = async () => {
+  try {
+    await Appointment.updateMany(
+      {
+        status: 'CONFIRMED',
+        $expr: {
+          $lt: [
+            { $add: ['$scheduledAt', { $multiply: [{ $ifNull: ['$duration', 60] }, 60000] }] },
+            new Date(),
+          ],
+        },
+      },
+      { $set: { status: 'COMPLETED' } }
+    );
+  } catch (err) {
+    console.error('Auto-complete error:', err);
+  }
+};
+
+// Run once on startup, then every 5 minutes
+autoCompleteAppointments();
+setInterval(autoCompleteAppointments, 5 * 60 * 1000);
 
 const PORT = process.env.PORT || 3001;
 

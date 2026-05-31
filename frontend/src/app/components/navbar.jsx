@@ -1,12 +1,14 @@
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { Button } from "./ui/button.jsx";
 import { Menu, X, User, Calendar, Settings, Brain } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
+import { NotificationBell } from "./notification-bell.jsx";
 
 export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { isAuthenticated, user, logout } = useAuth();
+  const navigate = useNavigate();
   const dashboardLink = user?.role ? `/dashboard/${user.role.toLowerCase()}` : "/dashboard/patient";
 
   return (
@@ -77,12 +79,13 @@ export function Navbar() {
 
           {isAuthenticated ? (
             <div className="flex items-center gap-3">
+              <NotificationBell />
               <Link to={dashboardLink}>
                 <Button variant="outline" className="border-green-600 text-green-600 hover:bg-green-50">
                   Dashboard
                 </Button>
               </Link>
-              <Button onClick={logout} className="bg-green-600 text-white hover:bg-green-700">
+              <Button onClick={() => { logout(); navigate('/'); }} className="bg-green-600 text-white hover:bg-green-700">
                 Logout
               </Button>
             </div>
@@ -202,7 +205,7 @@ export function Navbar() {
                   </Button>
                 </Link>
                 <Button
-                  onClick={() => { logout(); setMobileMenuOpen(false); }}
+                  onClick={() => { logout(); setMobileMenuOpen(false); navigate('/'); }}
                   className="w-full bg-green-600 text-white hover:bg-green-700"
                 >
                   Logout
