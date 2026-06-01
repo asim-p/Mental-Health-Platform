@@ -51,7 +51,7 @@ export function AdminDashboard() {
       setIsLoading(false);
     }
   };
-
+  
   const handleVerifyTherapist = async (id, action) => {
     try {
       await api.users.verifyTherapist(id, action);
