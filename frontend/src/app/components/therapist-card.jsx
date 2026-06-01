@@ -8,7 +8,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 export function TherapistCard({ therapist }) {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const isTherapist = user?.role === 'THERAPIST';
+  const isTherapist = user?.role === 'THERAPIST' || user?.role === 'ADMIN';
   const displayName = therapist.name;
 
   const handleBookClick = () => {

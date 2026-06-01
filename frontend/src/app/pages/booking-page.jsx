@@ -124,8 +124,8 @@ export function BookingPage() {
       });
 
       if (response.success) {
-        toast.success("Appointment booked! Redirecting to payment...");
-        
+        toast.info("Redirecting to eSewa...");
+
         const paymentRes = await api.payments.initiate(response.data.id);
         
         if (paymentRes.success && paymentRes.data) {

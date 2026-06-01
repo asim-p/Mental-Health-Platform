@@ -36,7 +36,7 @@ export function Navbar() {
                   </span>
                 </div>
                 <span className="text-xs text-gray-500">
-                  {user.role === 'THERAPIST' ? 'Therapist' : 'Patient'}
+                  {user.role === 'THERAPIST' ? 'Therapist' : user.role === 'ADMIN' ? 'Administrator' : 'Patient'}
                 </span>
               </div>
             </div>
@@ -46,7 +46,6 @@ export function Navbar() {
         {/* Desktop Navigation */}
         <nav className="hidden lg:flex items-center gap-6">
           {user?.role === 'THERAPIST' ? (
-            // Therapist Navigation
             <>
               <Link to="/dashboard/therapist" className="text-gray-700 hover:text-green-600 font-medium">
                 My Dashboard
@@ -58,8 +57,13 @@ export function Navbar() {
                 Profile Settings
               </Link>
             </>
+          ) : user?.role === 'ADMIN' ? (
+            <>
+              <Link to="/therapists" className="text-gray-700 hover:text-green-600 font-medium">
+                View Therapists
+              </Link>
+            </>
           ) : (
-            // Patient Navigation
             <>
               <Link to="/screening" className="text-gray-700 hover:text-green-600 font-medium">
                 AI Screening
@@ -129,7 +133,7 @@ export function Navbar() {
                     </span>
                   </div>
                   <span className="text-xs text-gray-500">
-                    {user.role === 'THERAPIST' ? 'Therapist' : 'Patient'}
+                    {user.role === 'THERAPIST' ? 'Therapist' : user.role === 'ADMIN' ? 'Administrator' : 'Patient'}
                   </span>
                 </div>
               </div>
@@ -137,52 +141,32 @@ export function Navbar() {
 
             {/* Mobile Navigation */}
             {user?.role === 'THERAPIST' ? (
-              // Therapist Mobile Navigation
               <>
-                <Link
-                  to="/dashboard/therapist"
-                  className="text-gray-700 hover:text-green-600 font-medium"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
+                <Link to="/dashboard/therapist" className="text-gray-700 hover:text-green-600 font-medium" onClick={() => setMobileMenuOpen(false)}>
                   My Dashboard
                 </Link>
-                <Link
-                  to="/dashboard/therapist/availability"
-                  className="text-gray-700 hover:text-green-600 font-medium"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
+                <Link to="/dashboard/therapist/availability" className="text-gray-700 hover:text-green-600 font-medium" onClick={() => setMobileMenuOpen(false)}>
                   Availability
                 </Link>
-                <Link
-                  to="/dashboard/therapist/settings"
-                  className="text-gray-700 hover:text-green-600 font-medium"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
+                <Link to="/dashboard/therapist/settings" className="text-gray-700 hover:text-green-600 font-medium" onClick={() => setMobileMenuOpen(false)}>
                   Profile Settings
                 </Link>
               </>
-            ) : (
-              // Patient Mobile Navigation
+            ) : user?.role === 'ADMIN' ? (
               <>
-                <Link
-                  to="/screening"
-                  className="text-gray-700 hover:text-green-600 font-medium"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
+                <Link to="/dashboard/admin" className="text-gray-700 hover:text-green-600 font-medium" onClick={() => setMobileMenuOpen(false)}>
+                  Admin Panel
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link to="/screening" className="text-gray-700 hover:text-green-600 font-medium" onClick={() => setMobileMenuOpen(false)}>
                   AI Screening
                 </Link>
-                <Link
-                  to="/therapists"
-                  className="text-gray-700 hover:text-green-600 font-medium"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
+                <Link to="/therapists" className="text-gray-700 hover:text-green-600 font-medium" onClick={() => setMobileMenuOpen(false)}>
                   Find Therapists
                 </Link>
-                <Link
-                  to="/how-it-works"
-                  className="text-gray-700 hover:text-green-600 font-medium"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
+                <Link to="/how-it-works" className="text-gray-700 hover:text-green-600 font-medium" onClick={() => setMobileMenuOpen(false)}>
                   How It Works
                 </Link>
               </>

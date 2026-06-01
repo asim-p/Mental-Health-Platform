@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Button } from '../components/ui/button.jsx';
 import { Badge } from '../components/ui/badge.jsx';
 import { Navbar } from '../components/navbar.jsx';
-import { Users, UserCheck, ShieldAlert, DollarSign, Calendar, CheckCircle, XCircle, Trash2 } from 'lucide-react';
+import { Users, UserCheck, ShieldAlert, DollarSign, Calendar, CheckCircle, XCircle, Trash2, Clock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../services/api.js';
 import { toast } from 'sonner';
@@ -16,8 +16,10 @@ export function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [therapists, setTherapists] = useState([]);
   const [patients, setPatients] = useState([]);
+  const [sessions, setSessions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('therapists'); // 'therapists' or 'patients'
+  const [activeTab, setActiveTab] = useState('therapists');
+  const [sessionFilter, setSessionFilter] = useState('all');
 
   useEffect(() => {
     if (!user || user.role !== 'ADMIN') {
@@ -30,15 +32,17 @@ export function AdminDashboard() {
 
   const fetchData = async () => {
     try {
-      const [statsRes, therapistsRes, patientsRes] = await Promise.all([
+      const [statsRes, therapistsRes, patientsRes, sessionsRes] = await Promise.all([
         api.admin.getStats(),
         api.users.getTherapists(),
-        api.users.getPatients()
+        api.users.getPatients(),
+        api.appointments.getAll({}),
       ]);
 
       if (statsRes.success) setStats(statsRes.data);
       if (therapistsRes.success) setTherapists(therapistsRes.data);
       if (patientsRes.success) setPatients(patientsRes.data);
+      if (sessionsRes.success) setSessions(sessionsRes.data);
       
     } catch (error) {
       console.error('Failed to fetch admin data:', error);
@@ -52,9 +56,32 @@ export function AdminDashboard() {
     try {
       await api.users.verifyTherapist(id, action);
       toast.success(`Therapist ${action === 'APPROVE' ? 'approved' : 'rejected'} successfully`);
-      fetchData(); // Refresh data to update status and stats
+      // Optimistically update local state so UI reflects change immediately
+      setTherapists(prev => prev.map(t =>
+        t.id === id
+          ? {
+              ...t,
+              therapistProfile: {
+                ...t.therapistProfile,
+                isVerified: action === 'APPROVE',
+                verificationStatus: action === 'APPROVE' ? 'APPROVED' : 'REJECTED',
+              },
+            }
+          : t
+      ));
     } catch (error) {
       toast.error('Failed to update therapist verification status');
+    }
+  };
+
+  const handleCancelSession = async (id) => {
+    if (!window.confirm('Are you sure you want to cancel this session?')) return;
+    try {
+      await api.appointments.cancel(id, 'Cancelled by admin');
+      toast.success('Session cancelled');
+      setSessions(prev => prev.map(s => s.id === id ? { ...s, status: 'CANCELLED' } : s));
+    } catch {
+      toast.error('Failed to cancel session');
     }
   };
 
@@ -301,6 +328,111 @@ export function AdminDashboard() {
                     <tr>
                       <td colSpan="5" className="px-4 py-8 text-center text-muted-foreground">
                         No {activeTab} found
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Session Management Section */}
+        <Card className="mt-8">
+          <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Clock size={20} className="text-primary" />
+                Session Management
+              </CardTitle>
+              <CardDescription>View and manage all therapy sessions on the platform</CardDescription>
+            </div>
+            <div className="flex flex-wrap gap-1 bg-muted p-1 rounded-md mt-4 sm:mt-0">
+              {['all', 'PENDING', 'PAID', 'CONFIRMED', 'COMPLETED', 'CANCELLED'].map(f => (
+                <Button
+                  key={f}
+                  variant={sessionFilter === f ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setSessionFilter(f)}
+                  className="text-xs"
+                >
+                  {f === 'all' ? `All (${sessions.length})` : `${f.charAt(0) + f.slice(1).toLowerCase()} (${sessions.filter(s => s.status === f).length})`}
+                </Button>
+              ))}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="text-xs text-muted-foreground bg-muted/50 uppercase">
+                  <tr>
+                    <th className="px-4 py-3 rounded-tl-lg">Patient</th>
+                    <th className="px-4 py-3">Therapist</th>
+                    <th className="px-4 py-3">Scheduled</th>
+                    <th className="px-4 py-3">Amount</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3 rounded-tr-lg text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(sessionFilter === 'all' ? sessions : sessions.filter(s => s.status === sessionFilter))
+                    .sort((a, b) => new Date(b.scheduledAt) - new Date(a.scheduledAt))
+                    .map(s => {
+                      const statusColors = {
+                        PENDING: 'bg-yellow-100 text-yellow-700',
+                        PAID: 'bg-orange-100 text-orange-700',
+                        CONFIRMED: 'bg-green-100 text-green-700',
+                        COMPLETED: 'bg-blue-100 text-blue-700',
+                        CANCELLED: 'bg-red-100 text-red-700',
+                      };
+                      const statusLabels = {
+                        PENDING: 'Awaiting Payment',
+                        PAID: 'Awaiting Confirmation',
+                        CONFIRMED: 'Confirmed',
+                        COMPLETED: 'Completed',
+                        CANCELLED: 'Cancelled',
+                      };
+                      return (
+                        <tr key={s.id} className="border-b last:border-0 hover:bg-muted/30">
+                          <td className="px-4 py-3 font-medium">
+                            {s.patient?.user?.firstName} {s.patient?.user?.lastName}
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground">
+                            Dr. {s.therapist?.user?.firstName} {s.therapist?.user?.lastName}
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground">
+                            {new Date(s.scheduledAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            <br />
+                            <span className="text-xs">{new Date(s.scheduledAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground">
+                            {s.payment?.amount ? `NPR ${s.payment.amount.toLocaleString()}` : '—'}
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge className={`${statusColors[s.status] || 'bg-gray-100 text-gray-700'} border-none text-xs`}>
+                              {statusLabels[s.status] || s.status}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            {s.status !== 'CANCELLED' && s.status !== 'COMPLETED' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                onClick={() => handleCancelSession(s.id)}
+                                title="Cancel Session"
+                              >
+                                <XCircle size={16} />
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  {(sessionFilter === 'all' ? sessions : sessions.filter(s => s.status === sessionFilter)).length === 0 && (
+                    <tr>
+                      <td colSpan="6" className="px-4 py-8 text-center text-muted-foreground">
+                        No sessions found
                       </td>
                     </tr>
                   )}
